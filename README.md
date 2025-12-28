@@ -88,6 +88,18 @@ Tools:\n
 * `ingest_ohlcv(symbol, timeframe, ohlcv_json, limit=100, source='user', ttl_sec=60.0)`\n
 * `get_ticker(symbol)`\n
 * `get_marketdata_status()`\n
+\n
+#### Websocket market data streams (Phase 2.5)\n
+ReadyTrader can run **opt-in** background websocket ticker streams for top exchanges and prefer them over CCXT REST.\n
+\n
+Tools:\n
+* `start_marketdata_ws(exchange, symbols_json, market_type='spot')`\n
+* `stop_marketdata_ws(exchange, market_type='spot')`\n
+\n
+Optional private order updates (Phase 2.5):\n
+* `start_cex_private_ws(exchange='binance', market_type='spot')`\n
+* `stop_cex_private_ws(exchange='binance', market_type='spot')`\n
+* `list_cex_private_updates(exchange='binance', market_type='spot', limit=100)`\n
 
 #### Ops/Observability (Phase 4)\n
 Docker-first approach (no ports required by default).\n

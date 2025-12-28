@@ -21,6 +21,7 @@ from web3 import Web3
 from backtest_engine import BacktestEngine
 from dex_handler import DexHandler
 from exchange_provider import ExchangeProvider
+from execution.binance_user_stream import BinanceUserStreamManager
 from execution.cex_executor import CexExecutor
 from execution.router import venue_allowed
 from execution_store import ExecutionStore
@@ -33,7 +34,13 @@ from intelligence import (
 )
 from learning import Learner
 from market_regime import RegimeDetector
-from marketdata import CcxtMarketDataProvider, IngestMarketDataProvider, InMemoryMarketDataStore, MarketDataBus
+from marketdata import (
+    CcxtMarketDataProvider,
+    IngestMarketDataProvider,
+    InMemoryMarketDataStore,
+    MarketDataBus,
+    WsStreamManager,
+)
 from observability import Metrics, build_log_context, log_event
 from paper_engine import PaperTradingEngine
 from policy_engine import PolicyEngine, PolicyError
@@ -56,9 +63,13 @@ regime_detector = RegimeDetector()
 risk_guardian = RiskGuardian()
 exchange_provider = ExchangeProvider()
 marketdata_store = InMemoryMarketDataStore()
+marketdata_ws_store = InMemoryMarketDataStore()
+ws_manager = WsStreamManager(store=marketdata_ws_store)
+binance_user_streams = BinanceUserStreamManager()
 marketdata_bus = MarketDataBus(
     [
         IngestMarketDataProvider(store=marketdata_store),
+        IngestMarketDataProvider(store=marketdata_ws_store, provider_id="exchange_ws"),
         CcxtMarketDataProvider(exchange_provider=exchange_provider),
     ]
 )
@@ -1405,9 +1416,142 @@ def get_marketdata_status() -> str:
         rl = _rate_limit("get_marketdata_status")
         if rl:
             return rl
-        return _json_ok({"bus": marketdata_bus.status(), "store": marketdata_store.stats()})
+        return _json_ok(
+            {
+                "bus": marketdata_bus.status(),
+                "stores": {
+                    "ingest": marketdata_store.stats(),
+                    "ws": marketdata_ws_store.stats(),
+                },
+                "ws_streams": ws_manager.status(),
+                "private_streams": {"binance_user_stream": binance_user_streams.status()},
+            }
+        )
 
     return _with_observability("get_marketdata_status", _run)
+
+
+@mcp.tool()
+def start_marketdata_ws(exchange: str, symbols_json: str, market_type: str = "spot") -> str:
+    """
+    Start a background websocket ticker stream for a top exchange.
+
+    Supported exchanges: binance, coinbase, kraken
+    """
+    return _with_observability(
+        "start_marketdata_ws",
+        lambda: _tool_start_marketdata_ws(exchange=exchange, symbols_json=symbols_json, market_type=market_type),
+    )
+
+
+def _tool_start_marketdata_ws(exchange: str, symbols_json: str, market_type: str = "spot") -> str:
+    rl = _rate_limit("start_marketdata_ws")
+    if rl:
+        return rl
+    try:
+        symbols = json.loads(symbols_json)
+        if not isinstance(symbols, list):
+            raise ValueError("symbols_json must be a JSON list")
+        ws_manager.start(exchange=exchange, symbols=[str(s) for s in symbols], market_type=market_type)
+        return _json_ok({"started": True, "exchange": exchange, "market_type": market_type, "symbols": symbols})
+    except Exception as e:
+        return _json_err("ws_start_error", str(e), {"exchange": exchange, "market_type": market_type})
+
+
+@mcp.tool()
+def stop_marketdata_ws(exchange: str, market_type: str = "spot") -> str:
+    return _with_observability(
+        "stop_marketdata_ws",
+        lambda: _tool_stop_marketdata_ws(exchange=exchange, market_type=market_type),
+    )
+
+
+def _tool_stop_marketdata_ws(exchange: str, market_type: str = "spot") -> str:
+    rl = _rate_limit("stop_marketdata_ws")
+    if rl:
+        return rl
+    try:
+        ws_manager.stop(exchange=exchange, market_type=market_type)
+        return _json_ok({"stopped": True, "exchange": exchange, "market_type": market_type})
+    except Exception as e:
+        return _json_err("ws_stop_error", str(e), {"exchange": exchange, "market_type": market_type})
+
+
+@mcp.tool()
+def start_cex_private_ws(exchange: str = "binance", market_type: str = "spot") -> str:
+    """
+    Start an optional private order update websocket stream.
+
+    Currently supported:
+    - binance (spot and swap)
+    """
+    return _with_observability(
+        "start_cex_private_ws",
+        lambda: _tool_start_cex_private_ws(exchange=exchange, market_type=market_type),
+    )
+
+
+def _tool_start_cex_private_ws(exchange: str = "binance", market_type: str = "spot") -> str:
+    rl = _rate_limit("start_cex_private_ws")
+    if rl:
+        return rl
+    if PAPER_MODE:
+        return _json_err("paper_mode_not_supported", "Private CEX streams are not supported in paper mode.")
+    ex = (exchange or "").strip().lower()
+    if ex != "binance":
+        return _json_err("unsupported_exchange", "Private stream supported only for binance.", {"exchange": exchange})
+    try:
+        policy_engine.validate_cex_access(exchange_id=ex)
+        binance_user_streams.start(market_type=market_type)
+        return _json_ok({"started": True, "exchange": ex, "market_type": market_type})
+    except PolicyError as e:
+        return _json_err(e.code, e.message, e.data)
+    except Exception as e:
+        return _json_err("private_ws_start_error", str(e), {"exchange": ex, "market_type": market_type})
+
+
+@mcp.tool()
+def stop_cex_private_ws(exchange: str = "binance", market_type: str = "spot") -> str:
+    return _with_observability(
+        "stop_cex_private_ws",
+        lambda: _tool_stop_cex_private_ws(exchange=exchange, market_type=market_type),
+    )
+
+
+def _tool_stop_cex_private_ws(exchange: str = "binance", market_type: str = "spot") -> str:
+    rl = _rate_limit("stop_cex_private_ws")
+    if rl:
+        return rl
+    ex = (exchange or "").strip().lower()
+    if ex != "binance":
+        return _json_err("unsupported_exchange", "Private stream supported only for binance.", {"exchange": exchange})
+    try:
+        binance_user_streams.stop(market_type=market_type)
+        return _json_ok({"stopped": True, "exchange": ex, "market_type": market_type})
+    except Exception as e:
+        return _json_err("private_ws_stop_error", str(e), {"exchange": ex, "market_type": market_type})
+
+
+@mcp.tool()
+def list_cex_private_updates(exchange: str = "binance", market_type: str = "spot", limit: int = 100) -> str:
+    return _with_observability(
+        "list_cex_private_updates",
+        lambda: _tool_list_cex_private_updates(exchange=exchange, market_type=market_type, limit=limit),
+    )
+
+
+def _tool_list_cex_private_updates(exchange: str = "binance", market_type: str = "spot", limit: int = 100) -> str:
+    rl = _rate_limit("list_cex_private_updates")
+    if rl:
+        return rl
+    ex = (exchange or "").strip().lower()
+    if ex != "binance":
+        return _json_err("unsupported_exchange", "Private updates supported only for binance.", {"exchange": exchange})
+    try:
+        events = binance_user_streams.list_events(market_type=market_type, limit=int(limit))
+        return _json_ok({"exchange": ex, "market_type": market_type, "events": events})
+    except Exception as e:
+        return _json_err("private_ws_list_error", str(e), {"exchange": ex, "market_type": market_type})
 
 
 @mcp.tool()
