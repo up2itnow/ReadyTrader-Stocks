@@ -154,6 +154,7 @@ class PolicyEngine:
         *,
         exchange_id: str,
         symbol: str,
+        market_type: str = "spot",
         side: str,
         amount: float,
         order_type: str,
@@ -162,6 +163,7 @@ class PolicyEngine:
     ) -> None:
         ex = exchange_id.strip().lower()
         sym = symbol.strip().upper()
+        mt = (market_type or "").strip().lower() or "spot"
         sd = side.strip().lower()
         ot = order_type.strip().lower()
 
@@ -179,6 +181,14 @@ class PolicyEngine:
                 code="symbol_not_allowed",
                 message=f"Symbol '{symbol}' is not allowlisted for CEX.",
                 data={"symbol": symbol, "allow_cex_symbols": sorted(allow_symbols)},
+            )
+
+        allow_market_types = _parse_csv_set(os.getenv("ALLOW_CEX_MARKET_TYPES"))
+        if allow_market_types and mt not in allow_market_types:
+            raise PolicyError(
+                code="market_type_not_allowed",
+                message=f"Market type '{market_type}' is not allowlisted for CEX.",
+                data={"market_type": market_type, "allow_cex_market_types": sorted(allow_market_types)},
             )
 
         if sd not in {"buy", "sell"}:

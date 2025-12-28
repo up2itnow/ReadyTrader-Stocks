@@ -50,6 +50,7 @@ def test_two_step_confirmation_for_cex_order():
         # Stub out ccxt executor
         fake_executor = MagicMock()
         fake_executor.place_order.return_value = {"id": "order123", "status": "open"}
+        fake_executor.normalize_order.return_value = {"id": "order123", "status": "open"}
         with patch("server.CexExecutor", return_value=fake_executor):
             proposal = json.loads(server._tool_place_cex_order("BTC/USDT", "buy", 0.01, exchange="binance"))
             assert proposal["ok"] is True
@@ -80,6 +81,7 @@ def test_cex_order_auto_executes_when_approval_mode_auto():
 
         fake_executor = MagicMock()
         fake_executor.place_order.return_value = {"id": "order999", "status": "open"}
+        fake_executor.normalize_order.return_value = {"id": "order999", "status": "open"}
         with patch("server.CexExecutor", return_value=fake_executor):
             res = json.loads(
                 server._tool_place_cex_order(

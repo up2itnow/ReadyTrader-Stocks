@@ -7,6 +7,8 @@ from typing import Any, Dict, Optional
 
 import ccxt
 
+from .models import normalize_ccxt_order, normalize_market_type
+
 
 @dataclass
 class CexCredentials:
@@ -24,7 +26,7 @@ def _env(name: str) -> Optional[str]:
     return v or None
 
 
-def load_cex_credentials(exchange_id: str) -> CexCredentials:
+def load_cex_credentials(exchange_id: str, *, require_auth: bool = True) -> Optional[CexCredentials]:
     """
     Load credentials for a given exchange from env vars.
 
@@ -40,6 +42,8 @@ def load_cex_credentials(exchange_id: str) -> CexCredentials:
     api_password = _env(prefix + "API_PASSWORD") or _env("CEX_API_PASSWORD")
 
     if not api_key or not api_secret:
+        if not require_auth:
+            return None
         raise ValueError(
             f"Missing CEX credentials for exchange '{exchange_id}'. Set {prefix}API_KEY/{prefix}API_SECRET "
             f"or CEX_API_KEY/CEX_API_SECRET."
@@ -55,42 +59,144 @@ def _get_default_type() -> Optional[str]:
     return dt.strip().lower() if dt else None
 
 
-@lru_cache(maxsize=8)
-def _get_exchange(exchange_id: str) -> ccxt.Exchange:
-    """
-    Cached ccxt exchange instance configured from env.
-    """
-    creds = load_cex_credentials(exchange_id)
-    if not hasattr(ccxt, creds.exchange_id):
-        raise ValueError(f"Unsupported exchange id for ccxt: {creds.exchange_id}")
+def _build_exchange(exchange_id: str, *, market_type: str, creds: Optional[CexCredentials]) -> ccxt.Exchange:
+    ex_id = exchange_id.strip().lower()
+    if not hasattr(ccxt, ex_id):
+        raise ValueError(f"Unsupported exchange id for ccxt: {ex_id}")
 
-    ex_cls = getattr(ccxt, creds.exchange_id)
+    ex_cls = getattr(ccxt, ex_id)
     params: Dict[str, Any] = {
-        "apiKey": creds.api_key,
-        "secret": creds.api_secret,
         "enableRateLimit": True,
     }
-    if creds.api_password:
-        params["password"] = creds.api_password
+    if creds is not None:
+        params["apiKey"] = creds.api_key
+        params["secret"] = creds.api_secret
+        if creds.api_password:
+            params["password"] = creds.api_password
 
     proxy = _get_proxy()
     if proxy:
         params["proxies"] = {"http": proxy, "https": proxy}
 
+    mt = normalize_market_type(market_type)
     default_type = _get_default_type()
+    # Allow per-instance defaultType so we can support spot + swap concurrently by creating distinct executors.
+    options: Dict[str, Any] = {}
     if default_type:
-        params["options"] = {"defaultType": default_type}
+        options["defaultType"] = default_type
+    if mt and mt != "auto":
+        options["defaultType"] = mt
+    if options:
+        params["options"] = options
 
     return ex_cls(params)
 
+@lru_cache(maxsize=64)
+def _get_public_exchange(exchange_id: str, market_type: str) -> ccxt.Exchange:
+    """
+    Cached public (unauthenticated) ccxt exchange instance configured from env.
+    """
+    return _build_exchange(exchange_id, market_type=market_type, creds=None)
+
+@lru_cache(maxsize=64)
+def _get_private_exchange(exchange_id: str, market_type: str) -> ccxt.Exchange:
+    """
+    Cached authenticated ccxt exchange instance configured from env.
+    """
+    creds = load_cex_credentials(exchange_id, require_auth=True)
+    return _build_exchange(exchange_id, market_type=market_type, creds=creds)
+
 
 class CexExecutor:
-    def __init__(self, exchange_id: str = "binance") -> None:
+    def __init__(self, exchange_id: str = "binance", *, market_type: str = "spot", auth: bool = True) -> None:
         self.exchange_id = exchange_id.strip().lower()
-        self._ex = _get_exchange(self.exchange_id)
+        self.market_type = normalize_market_type(market_type)
+        self.auth = bool(auth)
+        self._ex = (
+            _get_private_exchange(self.exchange_id, self.market_type)
+            if self.auth
+            else _get_public_exchange(self.exchange_id, self.market_type)
+        )
+
+    def _require_auth(self, op: str) -> None:
+        if not self.auth:
+            raise ValueError(f"{op} requires authenticated CEX credentials")
 
     def fetch_balance(self) -> Dict[str, Any]:
+        self._require_auth("fetch_balance")
         return self._ex.fetch_balance()
+
+    def _load_markets(self) -> Dict[str, Any]:
+        return self._ex.load_markets()
+
+    def resolve_symbol(self, symbol: str) -> str:
+        """
+        Resolve a user symbol to the exchange-listed symbol for the configured market_type.
+
+        Example:
+        - user: BTC/USDT + market_type=swap
+        - exchange: BTC/USDT:USDT
+        """
+        sym = symbol.strip().upper()
+        markets = self._load_markets()
+        if sym in markets:
+            # If the exact symbol exists but doesn't match the configured market type,
+            # prefer a base/quote match that does (e.g., spot BTC/USDT vs swap BTC/USDT:USDT).
+            m = markets.get(sym)
+            mt = self.market_type
+            if mt == "auto":
+                return sym
+            if isinstance(m, dict):
+                if mt == "spot" and m.get("spot") is True:
+                    return sym
+                if mt == "swap" and m.get("swap") is True:
+                    return sym
+                if mt == "future" and m.get("future") is True:
+                    return sym
+        if "/" not in sym:
+            return sym
+
+        base, quote = sym.split("/", 1)
+        mt = self.market_type
+        for m in markets.values():
+            if not isinstance(m, dict):
+                continue
+            mb = str(m.get("base") or "").upper()
+            mq = str(m.get("quote") or "").upper()
+            ms = str(m.get("symbol") or "")
+            if not ms or mb != base or mq != quote:
+                continue
+            if mt == "spot" and m.get("spot") is True:
+                return ms
+            if mt == "swap" and m.get("swap") is True:
+                return ms
+            if mt == "future" and m.get("future") is True:
+                return ms
+
+        # If nothing matched market type, return original.
+        return sym
+
+    def get_capabilities(self, *, symbol: str = "") -> Dict[str, Any]:
+        """
+        Return exchange capability info and (optional) market metadata for a given symbol.
+        """
+        cap = {
+            "exchange_id": getattr(self._ex, "id", self.exchange_id),
+            "market_type": self.market_type,
+            "has": getattr(self._ex, "has", {}),
+            "timeframes": getattr(self._ex, "timeframes", None),
+        }
+        try:
+            markets = self._load_markets()
+        except Exception:
+            markets = {}
+        if symbol:
+            resolved = self.resolve_symbol(symbol)
+            m = markets.get(resolved) or markets.get(symbol.strip().upper()) or None
+            cap["symbol"] = symbol
+            cap["resolved_symbol"] = resolved
+            cap["market"] = m
+        return cap
 
     def place_order(
         self,
@@ -100,8 +206,10 @@ class CexExecutor:
         amount: float,
         order_type: str = "market",
         price: Optional[float] = None,
+        params: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        s = symbol.strip()
+        self._require_auth("place_order")
+        s = self.resolve_symbol(symbol)
         t = order_type.strip().lower()
         sd = side.strip().lower()
 
@@ -117,30 +225,55 @@ class CexExecutor:
         # Ensure markets are loaded (symbol validation + normalization).
         # Some exchanges intermittently fail load_markets; order placement can still succeed.
         try:
-            self._ex.load_markets()
+            self._load_markets()
         except Exception:
             _ = False
 
         # ccxt: create_order(symbol, type, side, amount, price=None, params={})
+        p = params or {}
         if t == "market":
-            return self._ex.create_order(s, t, sd, amount)
-        return self._ex.create_order(s, t, sd, amount, price)
+            return self._ex.create_order(s, t, sd, amount, None, p)
+        return self._ex.create_order(s, t, sd, amount, price, p)
 
     def cancel_order(self, *, order_id: str, symbol: Optional[str] = None) -> Dict[str, Any]:
+        self._require_auth("cancel_order")
         if symbol:
             try:
-                self._ex.load_markets()
+                self._load_markets()
             except Exception:
                 _ = False
-            return self._ex.cancel_order(order_id, symbol.strip())
+            return self._ex.cancel_order(order_id, self.resolve_symbol(symbol))
         return self._ex.cancel_order(order_id)
 
     def fetch_order(self, *, order_id: str, symbol: Optional[str] = None) -> Dict[str, Any]:
+        self._require_auth("fetch_order")
         if symbol:
             try:
-                self._ex.load_markets()
+                self._load_markets()
             except Exception:
                 _ = False
-            return self._ex.fetch_order(order_id, symbol.strip())
+            return self._ex.fetch_order(order_id, self.resolve_symbol(symbol))
         return self._ex.fetch_order(order_id)
+
+    def fetch_open_orders(self, *, symbol: Optional[str] = None) -> list[Dict[str, Any]]:
+        self._require_auth("fetch_open_orders")
+        sym = self.resolve_symbol(symbol) if symbol else None
+        return self._ex.fetch_open_orders(sym) if sym else self._ex.fetch_open_orders()
+
+    def fetch_orders(self, *, symbol: Optional[str] = None, limit: Optional[int] = None) -> list[Dict[str, Any]]:
+        self._require_auth("fetch_orders")
+        sym = self.resolve_symbol(symbol) if symbol else None
+        if sym:
+            return self._ex.fetch_orders(sym, limit=limit) if limit else self._ex.fetch_orders(sym)
+        return self._ex.fetch_orders(limit=limit) if limit else self._ex.fetch_orders()
+
+    def fetch_my_trades(self, *, symbol: Optional[str] = None, limit: Optional[int] = None) -> list[Dict[str, Any]]:
+        self._require_auth("fetch_my_trades")
+        sym = self.resolve_symbol(symbol) if symbol else None
+        if sym:
+            return self._ex.fetch_my_trades(sym, limit=limit) if limit else self._ex.fetch_my_trades(sym)
+        return self._ex.fetch_my_trades(limit=limit) if limit else self._ex.fetch_my_trades()
+
+    def normalize_order(self, order: Dict[str, Any]) -> Dict[str, Any]:
+        return normalize_ccxt_order(exchange=self.exchange_id, market_type=self.market_type, order=order).to_dict()
 

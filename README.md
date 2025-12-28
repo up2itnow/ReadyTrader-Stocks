@@ -65,6 +65,7 @@ These are **deny-by-policy only if set** (if unset, the policy engine is permiss
 *   `DEX_SLIPPAGE_PCT=1.0` (passed to the 1inch swap API builder)
 *   `ALLOW_EXCHANGES=binance,kraken,coinbase` (CEX allowlist)
 *   `ALLOW_CEX_SYMBOLS=btc/usdt,eth/usdt` (CEX symbol allowlist; case-insensitive)
+*   `ALLOW_CEX_MARKET_TYPES=spot,swap,future` (CEX market-type allowlist; `swap` = perpetuals)
 *   `MAX_CEX_ORDER_AMOUNT=0.05` (max base-asset amount per CEX order)
 
 #### Market data connector tuning (CCXT) — competitive parity with CCXT MCP servers
@@ -137,10 +138,11 @@ Or per-exchange (preferred):
 * `CEX_BINANCE_API_PASSWORD=...` (optional)
 
 Tools:
-* `place_cex_order(symbol, side, amount, order_type='market', price=None, exchange='binance', idempotency_key='')`
-* `get_cex_balance(exchange='binance')`
-* `get_cex_order(order_id, symbol='', exchange='binance')`
-* `cancel_cex_order(order_id, symbol='', exchange='binance')`
+* `place_cex_order(symbol, side, amount, order_type='market', price=None, exchange='binance', market_type='spot', idempotency_key='')`
+* `get_cex_balance(exchange='binance', market_type='spot')`
+* `get_cex_order(order_id, symbol='', exchange='binance', market_type='spot')`
+* `cancel_cex_order(order_id, symbol='', exchange='binance', market_type='spot')`
+* `get_cex_capabilities(exchange='binance', symbol='', market_type='spot')`
 
 Market-data introspection:
 * `get_marketdata_capabilities(exchange_id='')`

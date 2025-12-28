@@ -971,6 +971,7 @@ def _tool_place_cex_order(
     order_type: str = "market",
     price: float | None = None,
     exchange: str = "binance",
+    market_type: str = "spot",
     idempotency_key: str = "",
 ) -> str:
     rl = _rate_limit("place_cex_order")
@@ -1050,6 +1051,7 @@ def _tool_place_cex_order(
         policy_engine.validate_cex_order(
             exchange_id=exchange,
             symbol=symbol,
+            market_type=market_type,
             side=side,
             amount=amount,
             order_type=order_type,
@@ -1066,6 +1068,7 @@ def _tool_place_cex_order(
                 payload={
                     "exchange": exchange,
                     "symbol": symbol,
+                    "market_type": market_type,
                     "side": side,
                     "amount": amount,
                     "order_type": order_type,
@@ -1091,9 +1094,15 @@ def _tool_place_cex_order(
                 }
             )
 
-        ex = CexExecutor(exchange_id=exchange)
+        ex = CexExecutor(exchange_id=exchange, market_type=market_type)
         order = ex.place_order(symbol=symbol, side=side, amount=amount, order_type=order_type, price=price)
-        out = {"mode": "live", "venue": "cex", "exchange": exchange, "order": order}
+        out = {
+            "mode": "live",
+            "venue": "cex",
+            "exchange": exchange,
+            "market_type": market_type,
+            "order": ex.normalize_order(order),
+        }
         if idempotency_key:
             IDEMPOTENCY_STORE[idempotency_key] = out
         return _json_ok({"idempotency_key": idempotency_key or None, **out})
@@ -1104,7 +1113,7 @@ def _tool_place_cex_order(
 
 
 @mcp.tool()
-def cancel_cex_order(order_id: str, symbol: str = "", exchange: str = "binance") -> str:
+def cancel_cex_order(order_id: str, symbol: str = "", exchange: str = "binance", market_type: str = "spot") -> str:
     rl = _rate_limit("cancel_cex_order")
     if rl:
         return rl
@@ -1124,9 +1133,9 @@ def cancel_cex_order(order_id: str, symbol: str = "", exchange: str = "binance")
         return gate
     try:
         policy_engine.validate_cex_access(exchange_id=exchange)
-        ex = CexExecutor(exchange_id=exchange)
+        ex = CexExecutor(exchange_id=exchange, market_type=market_type)
         res = ex.cancel_order(order_id=order_id, symbol=(symbol or None))
-        return _json_ok({"exchange": exchange, "order": res})
+        return _json_ok({"exchange": exchange, "market_type": market_type, "order": ex.normalize_order(res)})
     except PolicyError as e:
         return _json_err(e.code, e.message, e.data)
     except Exception as e:
@@ -1134,7 +1143,7 @@ def cancel_cex_order(order_id: str, symbol: str = "", exchange: str = "binance")
 
 
 @mcp.tool()
-def get_cex_order(order_id: str, symbol: str = "", exchange: str = "binance") -> str:
+def get_cex_order(order_id: str, symbol: str = "", exchange: str = "binance", market_type: str = "spot") -> str:
     rl = _rate_limit("get_cex_order")
     if rl:
         return rl
@@ -1149,9 +1158,9 @@ def get_cex_order(order_id: str, symbol: str = "", exchange: str = "binance") ->
         return _json_err("paper_mode_not_supported", "CEX order fetch is not supported in paper mode.")
     try:
         policy_engine.validate_cex_access(exchange_id=exchange)
-        ex = CexExecutor(exchange_id=exchange)
+        ex = CexExecutor(exchange_id=exchange, market_type=market_type)
         res = ex.fetch_order(order_id=order_id, symbol=(symbol or None))
-        return _json_ok({"exchange": exchange, "order": res})
+        return _json_ok({"exchange": exchange, "market_type": market_type, "order": ex.normalize_order(res)})
     except PolicyError as e:
         return _json_err(e.code, e.message, e.data)
     except Exception as e:
@@ -1166,6 +1175,7 @@ def place_cex_order(
     order_type: str = "market",
     price: float | None = None,
     exchange: str = "binance",
+    market_type: str = "spot",
     idempotency_key: str = "",
 ) -> str:
     return _tool_place_cex_order(
@@ -1175,11 +1185,12 @@ def place_cex_order(
         order_type=order_type,
         price=price,
         exchange=exchange,
+        market_type=market_type,
         idempotency_key=idempotency_key,
     )
 
 
-def _tool_get_cex_balance(exchange: str = "binance") -> str:
+def _tool_get_cex_balance(exchange: str = "binance", market_type: str = "spot") -> str:
     rl = _rate_limit("get_cex_balance")
     if rl:
         return rl
@@ -1200,10 +1211,18 @@ def _tool_get_cex_balance(exchange: str = "binance") -> str:
     try:
         # Read-only access: do not require consent, but still respect exchange allowlists if configured.
         policy_engine.validate_cex_access(exchange_id=exchange)
-        ex = CexExecutor(exchange_id=exchange)
+        ex = CexExecutor(exchange_id=exchange, market_type=market_type)
         bal = ex.fetch_balance()
         # Keep response smaller: return just 'total' if present
-        return _json_ok({"mode": "live", "venue": "cex", "exchange": exchange, "balance": bal.get("total", bal)})
+        return _json_ok(
+            {
+                "mode": "live",
+                "venue": "cex",
+                "exchange": exchange,
+                "market_type": market_type,
+                "balance": bal.get("total", bal),
+            }
+        )
     except PolicyError as e:
         return _json_err(e.code, e.message, e.data)
     except Exception as e:
@@ -1211,8 +1230,32 @@ def _tool_get_cex_balance(exchange: str = "binance") -> str:
 
 
 @mcp.tool()
-def get_cex_balance(exchange: str = "binance") -> str:
-    return _tool_get_cex_balance(exchange=exchange)
+def get_cex_balance(exchange: str = "binance", market_type: str = "spot") -> str:
+    return _tool_get_cex_balance(exchange=exchange, market_type=market_type)
+
+
+def _tool_get_cex_capabilities(exchange: str = "binance", symbol: str = "", market_type: str = "spot") -> str:
+    rl = _rate_limit("get_cex_capabilities")
+    if rl:
+        return rl
+    try:
+        policy_engine.validate_cex_access(exchange_id=exchange)
+        # Capabilities and market metadata are public data; do not require auth.
+        ex = CexExecutor(exchange_id=exchange, market_type=market_type, auth=False)
+        cap = ex.get_capabilities(symbol=symbol)
+        return _json_ok({"exchange": exchange, "market_type": market_type, "capabilities": cap})
+    except PolicyError as e:
+        return _json_err(e.code, e.message, e.data)
+    except Exception as e:
+        return _json_err("cex_capabilities_error", str(e), {"exchange": exchange, "symbol": symbol})
+
+
+@mcp.tool()
+def get_cex_capabilities(exchange: str = "binance", symbol: str = "", market_type: str = "spot") -> str:
+    """
+    Return CCXT capability metadata for a given exchange and optional symbol.
+    """
+    return _tool_get_cex_capabilities(exchange=exchange, symbol=symbol, market_type=market_type)
 
 @mcp.tool()
 def get_advanced_risk_disclosure() -> str:
@@ -1565,6 +1608,7 @@ def _tool_confirm_execution(request_id: str, confirm_token: str) -> str:
         if kind == "place_cex_order":
             exchange = payload["exchange"]
             symbol = payload["symbol"]
+            market_type = payload.get("market_type", "spot")
             side = payload["side"]
             amount = float(payload["amount"])
             order_type = payload["order_type"]
@@ -1572,15 +1616,16 @@ def _tool_confirm_execution(request_id: str, confirm_token: str) -> str:
             policy_engine.validate_cex_order(
                 exchange_id=exchange,
                 symbol=symbol,
+                market_type=market_type,
                 side=side,
                 amount=amount,
                 order_type=order_type,
                 price=price,
                 overrides=_effective_overrides(),
             )
-            ex = CexExecutor(exchange_id=exchange)
+            ex = CexExecutor(exchange_id=exchange, market_type=market_type)
             order = ex.place_order(symbol=symbol, side=side, amount=amount, order_type=order_type, price=price)
-            return _json_ok({"request_id": request_id, "kind": kind, "order": order})
+            return _json_ok({"request_id": request_id, "kind": kind, "order": ex.normalize_order(order)})
 
         return _json_err("unknown_kind", "Unknown execution kind.", {"request_id": request_id, "kind": kind})
     except PolicyError as e:
