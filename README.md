@@ -143,6 +143,12 @@ Tools:
 * `get_cex_order(order_id, symbol='', exchange='binance', market_type='spot')`
 * `cancel_cex_order(order_id, symbol='', exchange='binance', market_type='spot')`
 * `get_cex_capabilities(exchange='binance', symbol='', market_type='spot')`
+* `list_cex_open_orders(exchange='binance', symbol='', market_type='spot', limit=100)`
+* `list_cex_orders(exchange='binance', symbol='', market_type='spot', limit=100)`
+* `get_cex_my_trades(exchange='binance', symbol='', market_type='spot', limit=100)`
+* `cancel_all_cex_orders(exchange='binance', symbol='', market_type='spot')`
+* `replace_cex_order(exchange, order_id, symbol, side, amount, order_type='limit', price=None, market_type='spot')`
+* `wait_for_cex_order(exchange, order_id, symbol='', market_type='spot', timeout_sec=30, poll_interval_sec=2.0)`
 
 Market-data introspection:
 * `get_marketdata_capabilities(exchange_id='')`

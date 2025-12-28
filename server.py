@@ -10,6 +10,7 @@ Core responsibilities:
 
 import json
 import os
+import time
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
@@ -1256,6 +1257,301 @@ def get_cex_capabilities(exchange: str = "binance", symbol: str = "", market_typ
     Return CCXT capability metadata for a given exchange and optional symbol.
     """
     return _tool_get_cex_capabilities(exchange=exchange, symbol=symbol, market_type=market_type)
+
+
+def _tool_list_cex_open_orders(
+    *,
+    exchange: str = "binance",
+    symbol: str = "",
+    market_type: str = "spot",
+    limit: int = 100,
+) -> str:
+    rl = _rate_limit("list_cex_open_orders")
+    if rl:
+        return rl
+    exec_mode = _get_execution_mode()
+    if not venue_allowed(exec_mode, "cex"):
+        return _json_err(
+            "execution_mode_blocked",
+            f"list_cex_open_orders not allowed when EXECUTION_MODE={exec_mode}.",
+            {"execution_mode": exec_mode},
+        )
+    if PAPER_MODE:
+        return _json_err("paper_mode_not_supported", "CEX open orders are not supported in paper mode.")
+
+    try:
+        policy_engine.validate_cex_access(exchange_id=exchange)
+        ex = CexExecutor(exchange_id=exchange, market_type=market_type, auth=True)
+        orders = ex.fetch_open_orders(symbol=(symbol or None))
+        normalized = [ex.normalize_order(o) for o in (orders or [])]
+        return _json_ok(
+            {
+                "mode": "live",
+                "venue": "cex",
+                "exchange": exchange,
+                "market_type": market_type,
+                "symbol": symbol or None,
+                "orders": normalized[: max(0, int(limit))],
+            }
+        )
+    except PolicyError as e:
+        return _json_err(e.code, e.message, e.data)
+    except Exception as e:
+        return _json_err("cex_list_open_orders_error", str(e), {"exchange": exchange, "symbol": symbol})
+
+
+@mcp.tool()
+def list_cex_open_orders(
+    exchange: str = "binance",
+    symbol: str = "",
+    market_type: str = "spot",
+    limit: int = 100,
+) -> str:
+    return _tool_list_cex_open_orders(exchange=exchange, symbol=symbol, market_type=market_type, limit=limit)
+
+
+def _tool_list_cex_orders(
+    *,
+    exchange: str = "binance",
+    symbol: str = "",
+    market_type: str = "spot",
+    limit: int = 100,
+) -> str:
+    rl = _rate_limit("list_cex_orders")
+    if rl:
+        return rl
+    exec_mode = _get_execution_mode()
+    if not venue_allowed(exec_mode, "cex"):
+        return _json_err(
+            "execution_mode_blocked",
+            f"list_cex_orders not allowed when EXECUTION_MODE={exec_mode}.",
+            {"execution_mode": exec_mode},
+        )
+    if PAPER_MODE:
+        return _json_err("paper_mode_not_supported", "CEX order history is not supported in paper mode.")
+
+    try:
+        policy_engine.validate_cex_access(exchange_id=exchange)
+        ex = CexExecutor(exchange_id=exchange, market_type=market_type, auth=True)
+        orders = ex.fetch_orders(symbol=(symbol or None), limit=int(limit) if limit else None)
+        normalized = [ex.normalize_order(o) for o in (orders or [])]
+        return _json_ok(
+            {
+                "mode": "live",
+                "venue": "cex",
+                "exchange": exchange,
+                "market_type": market_type,
+                "symbol": symbol or None,
+                "orders": normalized,
+            }
+        )
+    except PolicyError as e:
+        return _json_err(e.code, e.message, e.data)
+    except Exception as e:
+        return _json_err("cex_list_orders_error", str(e), {"exchange": exchange, "symbol": symbol})
+
+
+@mcp.tool()
+def list_cex_orders(exchange: str = "binance", symbol: str = "", market_type: str = "spot", limit: int = 100) -> str:
+    return _tool_list_cex_orders(exchange=exchange, symbol=symbol, market_type=market_type, limit=limit)
+
+
+def _tool_get_cex_my_trades(
+    *,
+    exchange: str = "binance",
+    symbol: str = "",
+    market_type: str = "spot",
+    limit: int = 100,
+) -> str:
+    rl = _rate_limit("get_cex_my_trades")
+    if rl:
+        return rl
+    exec_mode = _get_execution_mode()
+    if not venue_allowed(exec_mode, "cex"):
+        return _json_err(
+            "execution_mode_blocked",
+            f"get_cex_my_trades not allowed when EXECUTION_MODE={exec_mode}.",
+            {"execution_mode": exec_mode},
+        )
+    if PAPER_MODE:
+        return _json_err("paper_mode_not_supported", "CEX trades are not supported in paper mode.")
+
+    try:
+        policy_engine.validate_cex_access(exchange_id=exchange)
+        ex = CexExecutor(exchange_id=exchange, market_type=market_type, auth=True)
+        trades = ex.fetch_my_trades(symbol=(symbol or None), limit=int(limit) if limit else None)
+        return _json_ok(
+            {
+                "mode": "live",
+                "venue": "cex",
+                "exchange": exchange,
+                "market_type": market_type,
+                "symbol": symbol or None,
+                "trades": trades,
+            }
+        )
+    except PolicyError as e:
+        return _json_err(e.code, e.message, e.data)
+    except Exception as e:
+        return _json_err("cex_trades_error", str(e), {"exchange": exchange, "symbol": symbol})
+
+
+@mcp.tool()
+def get_cex_my_trades(exchange: str = "binance", symbol: str = "", market_type: str = "spot", limit: int = 100) -> str:
+    return _tool_get_cex_my_trades(exchange=exchange, symbol=symbol, market_type=market_type, limit=limit)
+
+
+@mcp.tool()
+def cancel_all_cex_orders(exchange: str = "binance", symbol: str = "", market_type: str = "spot") -> str:
+    rl = _rate_limit("cancel_all_cex_orders")
+    if rl:
+        return rl
+    exec_mode = _get_execution_mode()
+    if not venue_allowed(exec_mode, "cex"):
+        return _json_err(
+            "execution_mode_blocked",
+            f"cancel_all_cex_orders not allowed when EXECUTION_MODE={exec_mode}.",
+            {"execution_mode": exec_mode},
+        )
+    if PAPER_MODE:
+        return _json_err("paper_mode_not_supported", "CEX cancel-all is not supported in paper mode.")
+    gate = _require_live_execution_allowed("cancel_all_cex_orders")
+    if gate:
+        return gate
+
+    try:
+        policy_engine.validate_cex_access(exchange_id=exchange)
+        ex = CexExecutor(exchange_id=exchange, market_type=market_type, auth=True)
+        res = ex.cancel_all_orders(symbol=(symbol or None))
+        return _json_ok({"exchange": exchange, "market_type": market_type, "result": res})
+    except PolicyError as e:
+        return _json_err(e.code, e.message, e.data)
+    except Exception as e:
+        return _json_err("cex_cancel_all_error", str(e), {"exchange": exchange, "symbol": symbol})
+
+
+@mcp.tool()
+def replace_cex_order(
+    exchange: str,
+    order_id: str,
+    symbol: str,
+    side: str,
+    amount: float,
+    order_type: str = "limit",
+    price: float | None = None,
+    market_type: str = "spot",
+) -> str:
+    rl = _rate_limit("replace_cex_order")
+    if rl:
+        return rl
+    exec_mode = _get_execution_mode()
+    if not venue_allowed(exec_mode, "cex"):
+        return _json_err(
+            "execution_mode_blocked",
+            f"replace_cex_order not allowed when EXECUTION_MODE={exec_mode}.",
+            {"execution_mode": exec_mode},
+        )
+    if PAPER_MODE:
+        return _json_err("paper_mode_not_supported", "CEX replace/edit is not supported in paper mode.")
+    gate = _require_live_execution_allowed("replace_cex_order")
+    if gate:
+        return gate
+
+    try:
+        # Validate the *new* order parameters.
+        policy_engine.validate_cex_order(
+            exchange_id=exchange,
+            symbol=symbol,
+            market_type=market_type,
+            side=side,
+            amount=amount,
+            order_type=order_type,
+            price=price,
+            overrides=_effective_overrides(),
+        )
+        ex = CexExecutor(exchange_id=exchange, market_type=market_type, auth=True)
+        res = ex.replace_order(
+            order_id=order_id,
+            symbol=symbol,
+            side=side,
+            amount=amount,
+            order_type=order_type,
+            price=price,
+        )
+        return _json_ok({"exchange": exchange, "market_type": market_type, "order": ex.normalize_order(res)})
+    except PolicyError as e:
+        return _json_err(e.code, e.message, e.data)
+    except Exception as e:
+        return _json_err("cex_replace_order_error", str(e), {"exchange": exchange, "order_id": order_id})
+
+
+@mcp.tool()
+def wait_for_cex_order(
+    exchange: str,
+    order_id: str,
+    symbol: str = "",
+    market_type: str = "spot",
+    timeout_sec: int = 30,
+    poll_interval_sec: float = 2.0,
+) -> str:
+    """
+    Poll an order until it reaches a terminal status or timeout expires.
+
+    This is a pragmatic alternative to private websocket order streams and is useful for agents that
+    want a single call to “wait for fill/cancel”.
+    """
+    rl = _rate_limit("wait_for_cex_order")
+    if rl:
+        return rl
+    exec_mode = _get_execution_mode()
+    if not venue_allowed(exec_mode, "cex"):
+        return _json_err(
+            "execution_mode_blocked",
+            f"wait_for_cex_order not allowed when EXECUTION_MODE={exec_mode}.",
+            {"execution_mode": exec_mode},
+        )
+    if PAPER_MODE:
+        return _json_err("paper_mode_not_supported", "CEX order polling is not supported in paper mode.")
+
+    try:
+        policy_engine.validate_cex_access(exchange_id=exchange)
+        ex = CexExecutor(exchange_id=exchange, market_type=market_type, auth=True)
+        timeout = max(1, int(timeout_sec))
+        interval = max(0.25, float(poll_interval_sec))
+        deadline = time.time() + float(timeout)
+
+        updates: list[Dict[str, Any]] = []
+        last_status: str | None = None
+        last_order: Dict[str, Any] | None = None
+
+        while time.time() < deadline:
+            raw = ex.fetch_order(order_id=order_id, symbol=(symbol or None))
+            norm = ex.normalize_order(raw)
+            last_order = norm
+            status = str(norm.get("status") or "unknown")
+            if status != last_status:
+                updates.append({"at": _now_iso(), "status": status, "order": norm})
+                last_status = status
+            if status in {"filled", "canceled", "rejected"}:
+                break
+            time.sleep(interval)
+
+        timed_out = last_status not in {"filled", "canceled", "rejected"}
+        return _json_ok(
+            {
+                "exchange": exchange,
+                "market_type": market_type,
+                "order_id": order_id,
+                "symbol": symbol or None,
+                "timed_out": timed_out,
+                "last_order": last_order,
+                "updates": updates,
+            }
+        )
+    except PolicyError as e:
+        return _json_err(e.code, e.message, e.data)
+    except Exception as e:
+        return _json_err("cex_wait_error", str(e), {"exchange": exchange, "order_id": order_id})
 
 @mcp.tool()
 def get_advanced_risk_disclosure() -> str:

@@ -122,6 +122,13 @@ class CexExecutor:
         if not self.auth:
             raise ValueError(f"{op} requires authenticated CEX credentials")
 
+    def supports(self, feature: str) -> bool:
+        """
+        CCXT feature flag helper.
+        """
+        has = getattr(self._ex, "has", {}) or {}
+        return bool(has.get(feature))
+
     def fetch_balance(self) -> Dict[str, Any]:
         self._require_auth("fetch_balance")
         return self._ex.fetch_balance()
@@ -276,4 +283,37 @@ class CexExecutor:
 
     def normalize_order(self, order: Dict[str, Any]) -> Dict[str, Any]:
         return normalize_ccxt_order(exchange=self.exchange_id, market_type=self.market_type, order=order).to_dict()
+
+    def cancel_all_orders(self, *, symbol: Optional[str] = None) -> Any:
+        """
+        Best-effort cancel-all wrapper (capability-gated).
+        """
+        self._require_auth("cancel_all_orders")
+        if not self.supports("cancelAllOrders"):
+            raise ValueError(f"{self.exchange_id} does not support cancelAllOrders")
+        sym = self.resolve_symbol(symbol) if symbol else None
+        return self._ex.cancel_all_orders(sym) if sym else self._ex.cancel_all_orders()
+
+    def replace_order(
+        self,
+        *,
+        order_id: str,
+        symbol: str,
+        side: str,
+        amount: float,
+        order_type: str = "limit",
+        price: Optional[float] = None,
+        params: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Best-effort edit/replace wrapper (capability-gated).
+        """
+        self._require_auth("replace_order")
+        if not self.supports("editOrder"):
+            raise ValueError(f"{self.exchange_id} does not support editOrder")
+        s = self.resolve_symbol(symbol)
+        t = order_type.strip().lower()
+        sd = side.strip().lower()
+        p = params or {}
+        return self._ex.edit_order(order_id, s, t, sd, amount, price, p)
 
