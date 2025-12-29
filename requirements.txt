@@ -1,4 +1,4 @@
-# Top-level dependencies (runtime + tests).
+# Top-level runtime dependencies.
 # For a fully pinned transitive lock, see: requirements.lock.txt
 fastmcp==2.14.1
 ccxt==4.5.29
@@ -11,5 +11,4 @@ tweepy==4.16.0
 praw==7.8.1
 newsapi-python==0.2.7
 RestrictedPython==8.1
-pytest==9.0.2
 websockets==15.0.1

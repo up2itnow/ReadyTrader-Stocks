@@ -829,6 +829,7 @@ def _tool_analyze_performance(symbol: str = None) -> str:
 
 @mcp.tool()
 def analyze_performance(symbol: str = None) -> str:
+    """Review past trade performance and generated lessons (optionally filtered by symbol)."""
     rl = _rate_limit("analyze_performance")
     if rl:
         return rl
@@ -1009,6 +1010,7 @@ def _tool_swap_tokens(
 
 @mcp.tool()
 def swap_tokens(from_token: str, to_token: str, amount: float, chain: str = "ethereum", rationale: str = "") -> str:
+    """Swap tokens on a DEX (paper mode or live; subject to consent, EXECUTION_MODE, and policy limits)."""
     return _tool_swap_tokens(from_token=from_token, to_token=to_token, amount=amount, chain=chain, rationale=rationale)
 
 
@@ -1163,6 +1165,7 @@ def _tool_place_cex_order(
 
 @mcp.tool()
 def cancel_cex_order(order_id: str, symbol: str = "", exchange: str = "binance", market_type: str = "spot") -> str:
+    """Cancel a live CEX order (requires live-trading consent gates; not supported in paper mode)."""
     rl = _rate_limit("cancel_cex_order")
     if rl:
         return rl
@@ -1193,6 +1196,7 @@ def cancel_cex_order(order_id: str, symbol: str = "", exchange: str = "binance",
 
 @mcp.tool()
 def get_cex_order(order_id: str, symbol: str = "", exchange: str = "binance", market_type: str = "spot") -> str:
+    """Fetch a live CEX order by id (read-only; requires CEX venue allowed; not supported in paper mode)."""
     rl = _rate_limit("get_cex_order")
     if rl:
         return rl
@@ -1227,6 +1231,7 @@ def place_cex_order(
     market_type: str = "spot",
     idempotency_key: str = "",
 ) -> str:
+    """Place a CEX order (paper mode simulates; live requires consent, EXECUTION_MODE, and policy limits)."""
     return _with_observability(
         "place_cex_order",
         lambda: _tool_place_cex_order(
@@ -1283,6 +1288,7 @@ def _tool_get_cex_balance(exchange: str = "binance", market_type: str = "spot") 
 
 @mcp.tool()
 def get_cex_balance(exchange: str = "binance", market_type: str = "spot") -> str:
+    """Fetch authenticated CEX balances (live only; respects CEX allowlists)."""
     return _with_observability(
         "get_cex_balance",
         lambda: _tool_get_cex_balance(exchange=exchange, market_type=market_type),
@@ -1412,6 +1418,7 @@ def ingest_ohlcv(
 
 @mcp.tool()
 def get_marketdata_status() -> str:
+    """Return MarketDataBus/provider status and websocket/private stream health."""
     def _run() -> str:
         rl = _rate_limit("get_marketdata_status")
         if rl:
@@ -1460,6 +1467,7 @@ def _tool_start_marketdata_ws(exchange: str, symbols_json: str, market_type: str
 
 @mcp.tool()
 def stop_marketdata_ws(exchange: str, market_type: str = "spot") -> str:
+    """Stop a previously started public websocket ticker stream (Phase 2.5)."""
     return _with_observability(
         "stop_marketdata_ws",
         lambda: _tool_stop_marketdata_ws(exchange=exchange, market_type=market_type),
@@ -1512,6 +1520,7 @@ def _tool_start_cex_private_ws(exchange: str = "binance", market_type: str = "sp
 
 @mcp.tool()
 def stop_cex_private_ws(exchange: str = "binance", market_type: str = "spot") -> str:
+    """Stop an optional private order update websocket stream (Phase 2.5)."""
     return _with_observability(
         "stop_cex_private_ws",
         lambda: _tool_stop_cex_private_ws(exchange=exchange, market_type=market_type),
@@ -1534,6 +1543,7 @@ def _tool_stop_cex_private_ws(exchange: str = "binance", market_type: str = "spo
 
 @mcp.tool()
 def list_cex_private_updates(exchange: str = "binance", market_type: str = "spot", limit: int = 100) -> str:
+    """List recent private websocket events (best-effort, in-memory, bounded history)."""
     return _with_observability(
         "list_cex_private_updates",
         lambda: _tool_list_cex_private_updates(exchange=exchange, market_type=market_type, limit=limit),
@@ -1634,6 +1644,7 @@ def list_cex_open_orders(
     market_type: str = "spot",
     limit: int = 100,
 ) -> str:
+    """List open orders on a CEX account (live only)."""
     return _with_observability(
         "list_cex_open_orders",
         lambda: _tool_list_cex_open_orders(exchange=exchange, symbol=symbol, market_type=market_type, limit=limit),
@@ -1683,6 +1694,7 @@ def _tool_list_cex_orders(
 
 @mcp.tool()
 def list_cex_orders(exchange: str = "binance", symbol: str = "", market_type: str = "spot", limit: int = 100) -> str:
+    """List recent CEX orders (live only)."""
     return _with_observability(
         "list_cex_orders",
         lambda: _tool_list_cex_orders(exchange=exchange, symbol=symbol, market_type=market_type, limit=limit),
@@ -1731,6 +1743,7 @@ def _tool_get_cex_my_trades(
 
 @mcp.tool()
 def get_cex_my_trades(exchange: str = "binance", symbol: str = "", market_type: str = "spot", limit: int = 100) -> str:
+    """List recent authenticated CEX trades (live only)."""
     return _with_observability(
         "get_cex_my_trades",
         lambda: _tool_get_cex_my_trades(exchange=exchange, symbol=symbol, market_type=market_type, limit=limit),
@@ -1739,6 +1752,7 @@ def get_cex_my_trades(exchange: str = "binance", symbol: str = "", market_type: 
 
 @mcp.tool()
 def cancel_all_cex_orders(exchange: str = "binance", symbol: str = "", market_type: str = "spot") -> str:
+    """Cancel all open orders on a CEX (live only; requires consent gates)."""
     rl = _rate_limit("cancel_all_cex_orders")
     if rl:
         return rl
@@ -1777,6 +1791,7 @@ def replace_cex_order(
     price: float | None = None,
     market_type: str = "spot",
 ) -> str:
+    """Replace an existing CEX order (best-effort; exchange support varies; live only)."""
     rl = _rate_limit("replace_cex_order")
     if rl:
         return rl
@@ -2108,6 +2123,7 @@ def _tool_set_execution_preferences(execution_approval_mode: str, risk_profile: 
 
 @mcp.tool()
 def set_execution_preferences(execution_approval_mode: str, risk_profile: str = "") -> str:
+    """Set per-process execution preferences (approval mode + optional risk profile preset)."""
     return _impl_set_execution_preferences(execution_approval_mode=execution_approval_mode, risk_profile=risk_profile)
 
 @mcp.tool()
@@ -2147,9 +2163,6 @@ def accept_risk_disclosure(accepted: bool) -> str:
 
 @mcp.tool()
 def run_synthetic_stress_test(strategy_code: str, config_json: str = "{}") -> str:
-    rl = _rate_limit("run_synthetic_stress_test")
-    if rl:
-        return rl
     """
     Run a deterministic synthetic market stress test against strategy_code.
 
@@ -2164,6 +2177,9 @@ def run_synthetic_stress_test(strategy_code: str, config_json: str = "{}") -> st
       - black_swan_prob (float)
       - parabolic_prob (float)
     """
+    rl = _rate_limit("run_synthetic_stress_test")
+    if rl:
+        return rl
     try:
         cfg = json.loads(config_json or "{}")
         if not isinstance(cfg, dict):
@@ -2183,6 +2199,7 @@ def run_synthetic_stress_test(strategy_code: str, config_json: str = "{}") -> st
 
 @mcp.tool()
 def list_pending_executions() -> str:
+    """List pending execution proposals (only used when EXECUTION_APPROVAL_MODE=approve_each)."""
     rl = _rate_limit("list_pending_executions")
     if rl:
         return rl
@@ -2190,6 +2207,7 @@ def list_pending_executions() -> str:
 
 @mcp.tool()
 def cancel_execution(request_id: str) -> str:
+    """Cancel a pending execution proposal by request_id."""
     rl = _rate_limit("cancel_execution")
     if rl:
         return rl

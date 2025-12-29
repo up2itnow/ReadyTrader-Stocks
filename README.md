@@ -25,7 +25,7 @@ This MCP (Model Context Protocol) Server provides a complete suite of cryptocurr
 ## 🛠️ Installation & Setup
 
 ### Prerequisites
-*   Docker & Docker Compose
+*   Docker (Docker Compose optional)
 
 ### 1. Build & Run (Standalone)
 Run the server in a container. It exposes stdio for MCP clients.
@@ -36,8 +36,17 @@ docker build -t readytrader .
 docker run --rm -i readytrader
 ```
 
+### Local development (no Docker)
+If you want to run or test ReadyTrader locally:
+
+```bash
+pip install -r requirements-dev.txt
+fastmcp run server.py
+```
+
 ### 2. Configuration (`.env`)
 Create a `.env` file or pass environment variables:
+*   Start from `env.example` (copy to `.env`; never commit real secrets)
 *   `PAPER_MODE=true` (Default: Safe simulation mode. Set `false` for real trading)
 *   `PRIVATE_KEY=...` (Required ONLY if `PAPER_MODE=false`)
 
@@ -273,6 +282,7 @@ You don't need to do anything. If the agent tries to bet 50% of the portfolio on
 ---
 
 ## 🧰 Tool Reference
+For the complete (generated) tool catalog with signatures and docstrings, see: `docs/TOOLS.md`.
 
 | Category | Tool | Description |
 | :--- | :--- | :--- |
@@ -317,3 +327,11 @@ Example `config_json`:
   "parabolic_prob": 0.02
 }
 ```
+
+---
+
+## 📌 Project docs
+- `docs/TOOLS.md`: complete tool catalog (generated from `server.py`)
+- `docs/POSITIONING.md`: credibility-safe marketing + messaging
+- `RELEASE_READINESS_CHECKLIST.md`: what must be green before distribution
+- `ROADMAP_10_OF_10.md`: phased plan to reach “10/10” maturity

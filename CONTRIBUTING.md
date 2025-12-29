@@ -2,7 +2,7 @@
 
 ### Local setup
 - Python 3.12+
-- Install deps: `pip install -r requirements.txt`
+- Install dev deps (includes runtime + test + security tooling): `pip install -r requirements-dev.txt`
 
 ### Checks
 - Lint: `ruff check .`
