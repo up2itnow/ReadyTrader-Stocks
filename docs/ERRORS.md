@@ -66,3 +66,13 @@ Errors are normalized via `errors.py` where possible:
 - **`ccxt_network_error`**, **`ccxt_exchange_unavailable`**
   - Fix: temporary outage; retry with backoff; consider switching marketdata providers.
 
+
+
+### Market data guardrails (Phase 3)
+- **`marketdata_not_acceptable`**
+  - Meaning: Operator enabled fail-closed market data mode and the best available ticker was stale or flagged as an outlier.
+  - Fix:
+    - inspect `get_ticker(symbol)` → `meta.candidates` to see which sources are stale or failing
+    - start/verify websocket streams (`start_marketdata_ws`) or ingest a feed (`ingest_ticker`)
+    - tune thresholds: `MARKETDATA_MAX_AGE_MS*`, `MARKETDATA_OUTLIER_MAX_PCT`, `MARKETDATA_OUTLIER_WINDOW_MS`
+    - disable fail-closed: `MARKETDATA_FAIL_CLOSED=false`

@@ -45,7 +45,8 @@ from marketdata import (
     WsStreamManager,
     load_marketdata_plugins,
 )
-from observability import AuditLog, Metrics, build_log_context, log_event, now_ms
+from observability import AuditLog, Metrics, build_log_context, log_event, now_ms, render_prometheus
+from observability.logging import get_current_context, set_current_context
 from paper_engine import PaperTradingEngine
 from policy_engine import PolicyEngine, PolicyError
 from rate_limiter import FixedWindowRateLimiter, RateLimitError
@@ -65,11 +66,16 @@ paper_engine = PaperTradingEngine() if PAPER_MODE else None
 backtest_engine = BacktestEngine()
 regime_detector = RegimeDetector()
 risk_guardian = RiskGuardian()
+
+# Phase 4: observability primitives should exist early so background threads can emit metrics.
+metrics = Metrics()
+audit_log = AuditLog()
+
 exchange_provider = ExchangeProvider()
 marketdata_store = InMemoryMarketDataStore()
 marketdata_ws_store = InMemoryMarketDataStore()
-ws_manager = WsStreamManager(store=marketdata_ws_store)
-binance_user_streams = BinanceUserStreamManager()
+ws_manager = WsStreamManager(store=marketdata_ws_store, metrics=metrics)
+binance_user_streams = BinanceUserStreamManager(metrics=metrics)
 cex_private_updates = CexPrivateUpdateManager()
 marketdata_bus = MarketDataBus(
     [
@@ -86,8 +92,6 @@ learner = Learner()
 policy_engine = PolicyEngine()
 rate_limiter = FixedWindowRateLimiter()
 execution_store = ExecutionStore()
-metrics = Metrics()
-audit_log = AuditLog()
 idempotency_store = IdempotencyStore()
 
 _IDEMPOTENCY_LOCK = threading.Lock()
@@ -222,7 +226,8 @@ def _with_observability(tool: str, fn):
     """
     ctx = build_log_context(tool=tool)
     started = time.time()
-    log_event("tool_start", ctx=ctx)
+    log_event("tool_start", ctx=ctx, level="info")
+    set_current_context(ctx)
     try:
         out = fn()
         metrics.inc(f"tool_{tool}_ok_total", 1)
@@ -263,17 +268,17 @@ def _with_observability(tool: str, fn):
             )
         except Exception as e:
             # Never let audit logging interfere with tool execution.
-            # build_log_context() + log_event() should be safe (no secrets; JSON-serializable primitives only).
-            log_event("audit_error", ctx=ctx, data={"error": str(e)})
+            log_event("audit_error", ctx=ctx, data={"error": str(e)}, level="warn")
         return out
     except Exception as e:
         metrics.inc(f"tool_{tool}_error_total", 1)
-        log_event("tool_error", ctx=ctx, data={"error": str(e)})
+        log_event("tool_error", ctx=ctx, data={"error": str(e)}, level="error")
         raise
     finally:
         elapsed_ms = (time.time() - started) * 1000.0
         metrics.observe_ms(f"tool_{tool}_latency_ms", elapsed_ms)
-        log_event("tool_end", ctx=ctx, data={"elapsed_ms": round(elapsed_ms, 3)})
+        log_event("tool_end", ctx=ctx, data={"elapsed_ms": round(elapsed_ms, 3)}, level="info")
+        set_current_context(None)
 
 def _policy_override_value(key: str, default: Any) -> Any:
     return POLICY_OVERRIDES.get(key, default)
@@ -845,6 +850,14 @@ def transfer_eth(to_address: str, amount: float, chain: str = "ethereum") -> str
                 payload={"chain": chain, "tx": tx, "to_address": to_checksum, "amount": float(amount)},
                 ttl_seconds=120,
             )
+            ctx = get_current_context()
+            if ctx:
+                log_event(
+                    "execution_proposal_created",
+                    ctx={**ctx, "flow_id": prop.request_id},
+                    data={"kind": "transfer_eth"},
+                    level="info",
+                )
             return _json_ok(
                 {
                     "mode": "live",
@@ -1035,6 +1048,14 @@ def _tool_swap_tokens(
                 payload={"chain": chain, "tx": tx, "from_token": from_token, "to_token": to_token, "amount": amount},
                 ttl_seconds=120,
             )
+            ctx = get_current_context()
+            if ctx:
+                log_event(
+                    "execution_proposal_created",
+                    ctx={**ctx, "flow_id": prop.request_id},
+                    data={"kind": "swap_tokens"},
+                    level="info",
+                )
             return _json_ok(
                 {
                     "mode": "live",
@@ -1156,6 +1177,16 @@ def _tool_place_cex_order(
             overrides=_effective_overrides(),
         )
 
+        # Phase 3D (optional): fail closed for market data if operator enables it.
+        if (
+            os.getenv("MARKETDATA_FAIL_CLOSED", "false").strip().lower() == "true"
+            and order_type.strip().lower() == "market"
+        ):
+            try:
+                _ = marketdata_bus.fetch_ticker(symbol)
+            except Exception as e:
+                return _json_err("marketdata_not_acceptable", str(e), {"symbol": symbol})
+
         # Optional idempotency: if provided, reuse result/proposal for duplicate requests.
         # (In MCP, this is useful for agent retries and to avoid duplicate orders.)
 
@@ -1173,6 +1204,15 @@ def _tool_place_cex_order(
                 },
                 ttl_seconds=120,
             )
+            # Correlation: include proposal request_id as a stable flow identifier for multi-step approvals.
+            ctx = get_current_context()
+            if ctx:
+                log_event(
+                    "execution_proposal_created",
+                    ctx={**ctx, "flow_id": prop.request_id},
+                    data={"kind": "place_cex_order"},
+                    level="info",
+                )
             out = {
                 "mode": "live",
                 "venue": "cex",
@@ -1637,6 +1677,18 @@ def get_metrics_snapshot() -> str:
     if rl:
         return rl
     return _json_ok(metrics.snapshot())
+
+
+@mcp.tool()
+def get_metrics_prometheus() -> str:
+    """
+    Return metrics in Prometheus text exposition format (no HTTP server; Docker-first).
+    """
+    rl = _rate_limit("get_metrics_prometheus")
+    if rl:
+        return rl
+    # This returns plaintext; callers can scrape by polling this tool.
+    return render_prometheus(metrics.snapshot(), namespace=os.getenv("READYTRADER_METRICS_NS", "readytrader"))
 
 
 @mcp.tool()
@@ -2280,32 +2332,41 @@ def run_synthetic_stress_test(strategy_code: str, config_json: str = "{}") -> st
 @mcp.tool()
 def list_pending_executions() -> str:
     """List pending execution proposals (only used when EXECUTION_APPROVAL_MODE=approve_each)."""
-    rl = _rate_limit("list_pending_executions")
-    if rl:
-        return rl
-    return _json_ok(execution_store.list_pending())
+    return _with_observability(
+        "list_pending_executions",
+        lambda: (
+            _rate_limit("list_pending_executions")
+            or _json_ok(execution_store.list_pending())
+        ),
+    )
 
 @mcp.tool()
 def cancel_execution(request_id: str) -> str:
     """Cancel a pending execution proposal by request_id."""
-    rl = _rate_limit("cancel_execution")
-    if rl:
-        return rl
-    ok = execution_store.cancel(request_id)
-    if not ok:
-        return _json_err(
-            "cancel_failed",
-            "Unable to cancel (not found, expired, already confirmed, or already cancelled).",
-            {"request_id": request_id},
-        )
-    return _json_ok({"request_id": request_id, "cancelled": True})
+    def _run() -> str:
+        rl = _rate_limit("cancel_execution")
+        if rl:
+            return rl
+        ok = execution_store.cancel(request_id)
+        if not ok:
+            return _json_err(
+                "cancel_failed",
+                "Unable to cancel (not found, expired, already confirmed, or already cancelled).",
+                {"request_id": request_id},
+            )
+        return _json_ok({"request_id": request_id, "cancelled": True})
+
+    return _with_observability("cancel_execution", _run)
 
 @mcp.tool()
 def confirm_execution(request_id: str, confirm_token: str) -> str:
     """
     Confirm a previously proposed execution. Replay protected (single-use, TTL).
     """
-    return _tool_confirm_execution(request_id, confirm_token)
+    return _with_observability(
+        "confirm_execution",
+        lambda: _tool_confirm_execution(request_id, confirm_token),
+    )
 
 def _tool_confirm_execution(request_id: str, confirm_token: str) -> str:
     rl = _rate_limit("confirm_execution")
@@ -2323,6 +2384,14 @@ def _tool_confirm_execution(request_id: str, confirm_token: str) -> str:
         return _json_err("confirm_failed", str(e), {"request_id": request_id})
 
     try:
+        ctx = get_current_context()
+        if ctx:
+            log_event(
+                "execution_confirmed",
+                ctx={**ctx, "flow_id": request_id},
+                data={"kind": prop.kind},
+                level="info",
+            )
         kind = prop.kind
         payload = prop.payload or {}
         if kind == "transfer_eth":
@@ -2359,6 +2428,14 @@ def _tool_confirm_execution(request_id: str, confirm_token: str) -> str:
             amount = float(payload["amount"])
             order_type = payload["order_type"]
             price = payload.get("price")
+            if (
+                os.getenv("MARKETDATA_FAIL_CLOSED", "false").strip().lower() == "true"
+                and str(order_type).strip().lower() == "market"
+            ):
+                try:
+                    _ = marketdata_bus.fetch_ticker(symbol)
+                except Exception as e:
+                    return _json_err("marketdata_not_acceptable", str(e), {"symbol": symbol})
             policy_engine.validate_cex_order(
                 exchange_id=exchange,
                 symbol=symbol,

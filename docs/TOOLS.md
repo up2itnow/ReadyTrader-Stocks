@@ -181,3 +181,8 @@ python tools/generate_tool_docs.py
 
 - **`get_capabilities()`**
   - Describe supported venues, chains, and safety flags for MCP clients.
+
+### Uncategorized
+
+- **`get_metrics_prometheus()`**
+  - Return metrics in Prometheus text exposition format (no HTTP server; Docker-first).

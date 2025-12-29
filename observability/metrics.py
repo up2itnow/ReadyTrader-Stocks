@@ -23,6 +23,11 @@ class _TimerAgg:
         self.max_ms = max(self.max_ms, ms)
 
 
+@dataclass
+class _Gauge:
+    value: float = 0.0
+
+
 class Metrics:
     """
     Minimal in-memory metrics registry (Docker-first, no ports required).
@@ -34,6 +39,7 @@ class Metrics:
         self._lock = threading.Lock()
         self._counters: Dict[str, _Counter] = {}
         self._timers: Dict[str, _TimerAgg] = {}
+        self._gauges: Dict[str, _Gauge] = {}
         self._started_at = time.time()
 
     def inc(self, name: str, value: int = 1) -> None:
@@ -45,6 +51,11 @@ class Metrics:
         with self._lock:
             t = self._timers.setdefault(name, _TimerAgg())
             t.observe(float(ms))
+
+    def set_gauge(self, name: str, value: float) -> None:
+        with self._lock:
+            g = self._gauges.setdefault(name, _Gauge())
+            g.value = float(value)
 
     def snapshot(self) -> Dict[str, Any]:
         with self._lock:
@@ -58,9 +69,11 @@ class Metrics:
                 }
                 for k, v in self._timers.items()
             }
+            gauges = {k: round(v.value, 6) for k, v in self._gauges.items()}
         return {
             "uptime_sec": int(time.time() - self._started_at),
             "counters": counters,
             "timers": timers,
+            "gauges": gauges,
         }
 

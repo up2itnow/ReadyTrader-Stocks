@@ -29,6 +29,18 @@ import websockets
 from .store import InMemoryMarketDataStore
 
 
+class _MetricsLike:
+    """
+    Minimal interface for observability integration.
+    """
+
+    def inc(self, name: str, value: int = 1) -> None:  # pragma: no cover (interface)
+        raise NotImplementedError
+
+    def set_gauge(self, name: str, value: float) -> None:  # pragma: no cover (interface)
+        raise NotImplementedError
+
+
 def _split_symbol(symbol: str) -> tuple[str, str]:
     """
     Split a symbol into (base, quote).
@@ -150,11 +162,13 @@ def parse_kraken_ticker_message(msg: Any) -> Optional[Dict[str, Any]]:
 
 
 class _WsStream:
-    def __init__(self) -> None:
+    def __init__(self, *, metrics: _MetricsLike | None = None, metric_prefix: str = "ws") -> None:
         self._stop = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._last_error: Optional[str] = None
         self._last_message_at: Optional[float] = None
+        self._metrics = metrics
+        self._metric_prefix = metric_prefix
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -162,6 +176,8 @@ class _WsStream:
         # If the stream was previously stopped, allow restarting.
         self._stop.clear()
         self._last_error = None
+        if self._metrics:
+            self._metrics.inc(f"{self._metric_prefix}_start_total", 1)
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
 
@@ -169,11 +185,15 @@ class _WsStream:
         self._stop.set()
         if self._thread:
             self._thread.join(timeout=3)
+        if self._metrics:
+            self._metrics.inc(f"{self._metric_prefix}_stop_total", 1)
 
     def status(self) -> Dict[str, Any]:
         age = None
         if self._last_message_at is not None:
             age = round(time.time() - self._last_message_at, 3)
+        if self._metrics and age is not None:
+            self._metrics.set_gauge(f"{self._metric_prefix}_last_message_age_sec", float(age))
         return {
             "running": bool(self._thread and self._thread.is_alive()),
             "last_error": self._last_error,
@@ -188,6 +208,8 @@ class _WsStream:
 
     def _mark_message(self) -> None:
         self._last_message_at = time.time()
+        if self._metrics:
+            self._metrics.inc(f"{self._metric_prefix}_messages_total", 1)
 
     async def _sleep_backoff(self, backoff: float) -> None:
         """
@@ -199,8 +221,15 @@ class _WsStream:
 
 
 class BinanceTickerStream(_WsStream):
-    def __init__(self, *, symbols: List[str], market_type: str, store: InMemoryMarketDataStore) -> None:
-        super().__init__()
+    def __init__(
+        self,
+        *,
+        symbols: List[str],
+        market_type: str,
+        store: InMemoryMarketDataStore,
+        metrics: _MetricsLike | None = None,
+    ) -> None:
+        super().__init__(metrics=metrics, metric_prefix=f"ws_binance_{market_type}")
         self.exchange = "binance"
         self.market_type = market_type
         self.symbols = [s.strip().upper() for s in symbols if s.strip()]
@@ -219,6 +248,8 @@ class BinanceTickerStream(_WsStream):
         backoff = 1.0
         while not self._stop.is_set():
             try:
+                if self._metrics:
+                    self._metrics.inc(f"{self._metric_prefix}_connect_total", 1)
                 async with websockets.connect(self._url(), ping_interval=20, ping_timeout=20) as ws:
                     backoff = 1.0
                     while not self._stop.is_set():
@@ -226,6 +257,8 @@ class BinanceTickerStream(_WsStream):
                         msg = json.loads(raw)
                         snap = parse_binance_ticker_message(msg, stream_to_symbol=self.stream_to_symbol)
                         if not snap:
+                            if self._metrics:
+                                self._metrics.inc(f"{self._metric_prefix}_parse_fail_total", 1)
                             continue
                         self._mark_message()
                         self.store.put_ticker(
@@ -239,13 +272,21 @@ class BinanceTickerStream(_WsStream):
                         )
             except Exception as e:
                 self._last_error = str(e)
+                if self._metrics:
+                    self._metrics.inc(f"{self._metric_prefix}_error_total", 1)
                 await self._sleep_backoff(backoff)
                 backoff = min(30.0, backoff * 2)
 
 
 class CoinbaseTickerStream(_WsStream):
-    def __init__(self, *, symbols: List[str], store: InMemoryMarketDataStore) -> None:
-        super().__init__()
+    def __init__(
+        self,
+        *,
+        symbols: List[str],
+        store: InMemoryMarketDataStore,
+        metrics: _MetricsLike | None = None,
+    ) -> None:
+        super().__init__(metrics=metrics, metric_prefix="ws_coinbase_spot")
         self.exchange = "coinbase"
         self.symbols = [s.strip().upper() for s in symbols if s.strip()]
         self.store = store
@@ -257,6 +298,8 @@ class CoinbaseTickerStream(_WsStream):
         backoff = 1.0
         while not self._stop.is_set():
             try:
+                if self._metrics:
+                    self._metrics.inc(f"{self._metric_prefix}_connect_total", 1)
                 async with websockets.connect(url, ping_interval=20, ping_timeout=20) as ws:
                     backoff = 1.0
                     await ws.send(json.dumps(sub))
@@ -265,6 +308,8 @@ class CoinbaseTickerStream(_WsStream):
                         msg = json.loads(raw)
                         snap = parse_coinbase_ticker_message(msg)
                         if not snap:
+                            if self._metrics:
+                                self._metrics.inc(f"{self._metric_prefix}_parse_fail_total", 1)
                             continue
                         self._mark_message()
                         self.store.put_ticker(
@@ -278,13 +323,21 @@ class CoinbaseTickerStream(_WsStream):
                         )
             except Exception as e:
                 self._last_error = str(e)
+                if self._metrics:
+                    self._metrics.inc(f"{self._metric_prefix}_error_total", 1)
                 await self._sleep_backoff(backoff)
                 backoff = min(30.0, backoff * 2)
 
 
 class KrakenTickerStream(_WsStream):
-    def __init__(self, *, symbols: List[str], store: InMemoryMarketDataStore) -> None:
-        super().__init__()
+    def __init__(
+        self,
+        *,
+        symbols: List[str],
+        store: InMemoryMarketDataStore,
+        metrics: _MetricsLike | None = None,
+    ) -> None:
+        super().__init__(metrics=metrics, metric_prefix="ws_kraken_spot")
         self.exchange = "kraken"
         self.symbols = [s.strip().upper() for s in symbols if s.strip()]
         self.store = store
@@ -296,6 +349,8 @@ class KrakenTickerStream(_WsStream):
         backoff = 1.0
         while not self._stop.is_set():
             try:
+                if self._metrics:
+                    self._metrics.inc(f"{self._metric_prefix}_connect_total", 1)
                 async with websockets.connect(url, ping_interval=20, ping_timeout=20) as ws:
                     backoff = 1.0
                     await ws.send(json.dumps(sub))
@@ -304,6 +359,8 @@ class KrakenTickerStream(_WsStream):
                         msg = json.loads(raw)
                         snap = parse_kraken_ticker_message(msg)
                         if not snap:
+                            if self._metrics:
+                                self._metrics.inc(f"{self._metric_prefix}_parse_fail_total", 1)
                             continue
                         self._mark_message()
                         self.store.put_ticker(
@@ -317,6 +374,8 @@ class KrakenTickerStream(_WsStream):
                         )
             except Exception as e:
                 self._last_error = str(e)
+                if self._metrics:
+                    self._metrics.inc(f"{self._metric_prefix}_error_total", 1)
                 await self._sleep_backoff(backoff)
                 backoff = min(30.0, backoff * 2)
 
@@ -328,8 +387,9 @@ class WsStreamManager:
     Streams are opt-in: nothing starts automatically in order to keep CI/tests deterministic.
     """
 
-    def __init__(self, *, store: InMemoryMarketDataStore) -> None:
+    def __init__(self, *, store: InMemoryMarketDataStore, metrics: _MetricsLike | None = None) -> None:
         self._store = store
+        self._metrics = metrics
         self._lock = threading.Lock()
         self._streams: Dict[str, _WsStream] = {}
 
@@ -339,11 +399,11 @@ class WsStreamManager:
         # Replace any existing stream for this (exchange, market_type) key to avoid duplicates.
         self.stop(exchange=ex, market_type=market_type)
         if ex == "binance":
-            s = BinanceTickerStream(symbols=symbols, market_type=market_type, store=self._store)
+            s = BinanceTickerStream(symbols=symbols, market_type=market_type, store=self._store, metrics=self._metrics)
         elif ex == "coinbase":
-            s = CoinbaseTickerStream(symbols=symbols, store=self._store)
+            s = CoinbaseTickerStream(symbols=symbols, store=self._store, metrics=self._metrics)
         elif ex == "kraken":
-            s = KrakenTickerStream(symbols=symbols, store=self._store)
+            s = KrakenTickerStream(symbols=symbols, store=self._store, metrics=self._metrics)
         else:
             raise ValueError("Unsupported exchange for websocket streams. Use one of: binance, coinbase, kraken")
         with self._lock:
