@@ -1,6 +1,6 @@
-## ReadyTrader Threat Model (Live Trading)
+## ReadyTrader-Crypto Threat Model (Live Trading)
 
-This document is an operator-focused threat model for ReadyTrader when configured for **live trading** (`PAPER_MODE=false`). It is intentionally concise and actionable.
+This document is an operator-focused threat model for ReadyTrader-Crypto when configured for **live trading** (`PAPER_MODE=false`). It is intentionally concise and actionable.
 
 ### Scope
 - **In scope**:
@@ -34,13 +34,13 @@ This document is an operator-focused threat model for ReadyTrader when configure
   - Prefer **keystore** or **remote signer** for production over `PRIVATE_KEY`.
 
 ### 2) Wrong-key / wrong-signer usage
-- **Threat**: ReadyTrader points at an unintended key and signs from the wrong wallet.
+- **Threat**: ReadyTrader-Crypto points at an unintended key and signs from the wrong wallet.
 - **Mitigations**:
   - Use `ALLOW_SIGNER_ADDRESSES` (PolicyEngine) to pin the expected signer address.
   - Use **signer policy wrapper** (`SIGNER_POLICY_*`) to restrict what the signer can sign.
 
 ### 3) Overbroad signing authority (remote signer/HSM proxy)
-- **Threat**: remote signer signs any tx presented by client; compromised ReadyTrader can drain funds.
+- **Threat**: remote signer signs any tx presented by client; compromised ReadyTrader-Crypto can drain funds.
 - **Mitigations**:
   - Phase 5 introduces **explicit signing intent** in RemoteSigner requests (`intent` payload).
   - Enforce on signer side:

@@ -1,4 +1,4 @@
-## ReadyTrader Error Codes (Operator Guide)
+## ReadyTrader-Crypto Error Codes (Operator Guide)
 
 ReadyTrader tools return JSON in one of these shapes:
 - Success: `{ "ok": true, "data": {...} }`

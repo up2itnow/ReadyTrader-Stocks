@@ -203,7 +203,7 @@ def main() -> int:
     used: set[str] = set()
     lines: list[str] = []
 
-    lines.append("## ReadyTrader MCP Tool Catalog")
+    lines.append("## ReadyTrader-Crypto MCP Tool Catalog")
     lines.append("")
     lines.append("This file is generated from `server.py`.")
     lines.append("")

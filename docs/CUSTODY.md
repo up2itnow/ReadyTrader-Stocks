@@ -1,6 +1,6 @@
 ## Key Custody & Rotation (Phase 5)
 
-This document describes recommended custody patterns for ReadyTrader when operating in live mode.
+This document describes recommended custody patterns for ReadyTrader-Crypto when operating in live mode.
 
 ### CEX API keys (least privilege)
 - Create **trade-only** keys when possible
@@ -21,7 +21,7 @@ This document describes recommended custody patterns for ReadyTrader when operat
 #### 3) `SIGNER_TYPE=remote` (enterprise-friendly)
 - Uses `SIGNER_REMOTE_URL` to sign via HTTP.
 - Recommended for HSM/KMS-backed signing proxies.
-- ReadyTrader includes explicit `intent` in signing requests (Phase 5) to enable safer signer-side policy.
+- ReadyTrader-Crypto includes explicit `intent` in signing requests (Phase 5) to enable safer signer-side policy.
 
 ### Defense in depth
 Use both layers when possible:

@@ -1,6 +1,6 @@
-## ReadyTrader Market Data (Phase 3)
+## ReadyTrader-Crypto Market Data (Phase 3)
 
-ReadyTrader routes market data via `MarketDataBus` and exposes it through MCP tools like `get_ticker()` and `fetch_ohlcv()`.
+ReadyTrader-Crypto routes market data via `MarketDataBus` and exposes it through MCP tools like `get_ticker()` and `fetch_ohlcv()`.
 
 ### Goals
 - Prefer **fresh** realtime data (websocket-first) when available
@@ -11,7 +11,7 @@ ReadyTrader routes market data via `MarketDataBus` and exposes it through MCP to
 ---
 
 ## Provider IDs (defaults)
-ReadyTrader typically wires providers in this order:
+ReadyTrader-Crypto typically wires providers in this order:
 - `exchange_ws` (public websocket tickers; opt-in)
 - `ingest` (user-provided snapshots via `ingest_ticker` / `ingest_ohlcv`)
 - `ccxt_rest` (CCXT REST fallback)

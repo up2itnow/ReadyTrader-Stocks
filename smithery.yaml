@@ -1,16 +1,11 @@
-runtime: "container"
+runtime: container
 
-# Smithery project configuration for ReadyTrader.
+# Smithery project configuration for ReadyTrader-Crypto.
 #
 # Notes:
 # - Smithery requires this file be placed in the repository root and named `smithery.yaml`.
-# - We use `runtime: container` because ReadyTrader is a Python MCP server shipped via Docker.
-# - The Docker image entrypoint is defined in `Dockerfile` (defaults to `fastmcp run server.py`).
-#
-# If/when you publish to Smithery and need Streamable HTTP transport, you can update the
-# container command/env to run FastMCP in HTTP transport mode (see FastMCP docs).
-
-runtime: container
+# - We use `runtime: container` because ReadyTrader-Crypto is a Python MCP server shipped via Docker.
+# - The Docker image entrypoint is defined in `Dockerfile`.
 
 # Smithery will build and run this project using Docker.
 # We run FastMCP in streamable-http mode so Smithery (and remote clients) can connect over HTTP.

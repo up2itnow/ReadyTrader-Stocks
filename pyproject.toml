@@ -1,7 +1,7 @@
 [project]
-name = "readytrader"
+name = "readytrader-crypto"
 version = "0.1.0"
-description = "ReadyTrader: agent-first crypto trading MCP with safety governance, backtesting, and stress testing."
+description = "ReadyTrader-Crypto: agent-first crypto trading MCP with safety governance, backtesting, and stress testing."
 requires-python = ">=3.12"
 
 [tool.pytest.ini_options]

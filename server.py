@@ -60,7 +60,7 @@ from stress_test_engine import run_synthetic_stress_test as _run_synth_stress
 load_dotenv()
 
 # Initialize FastMCP server
-mcp = FastMCP("ReadyTrader")
+mcp = FastMCP("ReadyTrader-Crypto")
 
 # Configuration
 PAPER_MODE = os.getenv("PAPER_MODE", "true").lower() == "true"

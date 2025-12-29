@@ -1,4 +1,4 @@
-## ReadyTrader MCP Tool Catalog
+## ReadyTrader-Crypto MCP Tool Catalog
 
 This file is generated from `server.py`.
 

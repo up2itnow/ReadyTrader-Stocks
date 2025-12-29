@@ -1,4 +1,4 @@
-## ReadyTrader Prompt Pack (Phase 6)
+## ReadyTrader-Crypto Prompt Pack (Phase 6)
 
 These are copy/paste prompts you can drop into Agent Zero, Claude, or any MCP-capable agent.
 
@@ -6,7 +6,7 @@ These are copy/paste prompts you can drop into Agent Zero, Claude, or any MCP-ca
 
 ## Prompt 1 — 10-minute paper-mode evaluation
 
-You have access to the ReadyTrader MCP server. We are in PAPER_MODE=true.
+You have access to the ReadyTrader-Crypto MCP server. We are in PAPER_MODE=true.
 
 Goals:
 - Validate you can use the tools safely

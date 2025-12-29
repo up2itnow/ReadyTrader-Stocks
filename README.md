@@ -1,8 +1,8 @@
-# ReadyTrader
+# ReadyTrader-Crypto
 
 ## Important Disclaimer (Read Before Use)
 
-ReadyTrader is provided for informational and educational purposes only and does not constitute financial, investment, legal, or tax advice. Trading digital assets involves substantial risk and may result in partial or total loss of funds. Past performance is not indicative of future results. You are solely responsible for any decisions, trades, configurations, supervision, and the security of your keys/credentials. ReadyTrader is provided “AS IS”, without warranties of any kind, and we make no guarantees regarding profitability, performance, availability, or outcomes. By using ReadyTrader, you acknowledge and accept these risks.
+ReadyTrader-Crypto is provided for informational and educational purposes only and does not constitute financial, investment, legal, or tax advice. Trading digital assets involves substantial risk and may result in partial or total loss of funds. Past performance is not indicative of future results. You are solely responsible for any decisions, trades, configurations, supervision, and the security of your keys/credentials. ReadyTrader-Crypto is provided “AS IS”, without warranties of any kind, and we make no guarantees regarding profitability, performance, availability, or outcomes. By using ReadyTrader-Crypto, you acknowledge and accept these risks.
 
 See also: `DISCLAIMER.md`.
 
@@ -35,7 +35,7 @@ You’ll get exportable artifacts under `artifacts/demo_stress/` (gitignored).
 
 Prompt pack (copy/paste): `prompts/READYTRADER_PROMPT_PACK.md`.
 
-![ReadyTrader demo flow](docs/assets/demo-flow.svg)
+![ReadyTrader-Crypto demo flow](docs/assets/demo-flow.svg)
 
 ## 🛠️ Installation & Setup
 
@@ -45,14 +45,14 @@ Prompt pack (copy/paste): `prompts/READYTRADER_PROMPT_PACK.md`.
 ### 1. Build & Run (Standalone)
 Run the server in a container. It exposes stdio for MCP clients.
 ```bash
-cd ReadyTrader
-docker build -t readytrader .
+cd ReadyTrader-Crypto
+docker build -t readytrader-crypto .
 # Run interactively (to test)
-docker run --rm -i readytrader
+docker run --rm -i readytrader-crypto
 ```
 
 ### Local development (no Docker)
-If you want to run or test ReadyTrader locally:
+If you want to run or test ReadyTrader-Crypto locally:
 
 ```bash
 pip install -r requirements-dev.txt
@@ -219,14 +219,15 @@ Market-data introspection:
 ## 🔌 Integration Guide
 
 ### Option A: Agent Zero (Recommended)
-To give Agent Zero these powers, add the following to your **Agent Zero Settings** (or `agent.yaml`):
+To give Agent Zero these powers, add the following to your **Agent Zero Settings** (or `agent.yaml`).
+The MCP server key/name is arbitrary; we use `readytrader_crypto` in examples.
 
 Quick copy/paste file: `configs/agent_zero.mcp.yaml`.
 
 **Via User Interface:**
 1.  Go to **Settings** -> **MCP Servers**.
 2.  Add a new server:
-    *   **Name**: `readytrader`
+    *   **Name**: `readytrader_crypto`
     *   **Type**: `stdio`
     *   **Command**: `docker`
     *   **Args**: `run`, `-i`, `--rm`, `-e`, `PAPER_MODE=true`, `readytrader`
@@ -234,7 +235,7 @@ Quick copy/paste file: `configs/agent_zero.mcp.yaml`.
 **Via `agent.yaml`:**
 ```yaml
 mcp_servers:
-  readytrader:
+  readytrader_crypto:
     command: "docker"
     args: 
       - "run"
@@ -242,9 +243,9 @@ mcp_servers:
       - "--rm"
       - "-e"
       - "PAPER_MODE=true"
-      - "readytrader"
+      - "readytrader-crypto"
 ```
-Prebuilt config: `configs/agent_zero.paper.yaml`.
+Prebuilt config: `configs/agent_zero.mcp.yaml`.
 *Restart Agent Zero after saving.*
 
 ### Option B: Generic MCP Client (Claude Desktop, etc.)
@@ -255,20 +256,20 @@ Quick copy/paste file: `configs/claude_desktop.mcp-server-config.json`.
 ```json
 {
   "mcpServers": {
-    "readytrader": {
+    "readytrader_crypto": {
       "command": "docker",
       "args": [
         "run", 
         "-i", 
         "--rm", 
         "-e", "PAPER_MODE=true", 
-        "readytrader"
+        "readytrader-crypto"
       ]
     }
   }
 }
 ```
-Prebuilt config: `configs/claude_desktop.mcp.json`.
+Prebuilt config: `configs/claude_desktop.mcp-server-config.json`.
 
 ---
 

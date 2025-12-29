@@ -1,8 +1,8 @@
 {
   "mcpServers": {
-    "readytrader": {
+    "readytrader_crypto": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "-e", "PAPER_MODE=true", "readytrader"]
+      "args": ["run", "-i", "--rm", "-e", "PAPER_MODE=true", "readytrader-crypto"]
     }
   }
 }
