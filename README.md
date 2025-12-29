@@ -333,6 +333,7 @@ Example `config_json`:
 ## 📌 Project docs
 - `docs/TOOLS.md`: complete tool catalog (generated from `server.py`)
 - `docs/ERRORS.md`: common error codes and operator troubleshooting
+- `docs/EXCHANGES.md`: exchange capability matrix (Supported vs Experimental)
 - `docs/POSITIONING.md`: credibility-safe marketing + messaging
 - `RELEASE_READINESS_CHECKLIST.md`: what must be green before distribution
 - `ROADMAP_10_OF_10.md`: phased plan to reach “10/10” maturity

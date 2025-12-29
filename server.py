@@ -24,6 +24,7 @@ from dex_handler import DexHandler
 from exchange_provider import ExchangeProvider
 from execution.binance_user_stream import BinanceUserStreamManager
 from execution.cex_executor import CexExecutor
+from execution.private_updates import CexPrivateUpdateManager
 from execution.router import venue_allowed
 from execution_store import ExecutionStore
 from idempotency_store import IdempotencyStore
@@ -68,6 +69,7 @@ marketdata_store = InMemoryMarketDataStore()
 marketdata_ws_store = InMemoryMarketDataStore()
 ws_manager = WsStreamManager(store=marketdata_ws_store)
 binance_user_streams = BinanceUserStreamManager()
+cex_private_updates = CexPrivateUpdateManager()
 marketdata_bus = MarketDataBus(
     [
         IngestMarketDataProvider(store=marketdata_store),
@@ -1153,7 +1155,7 @@ def _tool_place_cex_order(
         )
 
         # Optional idempotency: if provided, reuse result/proposal for duplicate requests.
-        # (In MCP, this is useful for agent retries.)
+        # (In MCP, this is useful for agent retries and to avoid duplicate orders.)
 
         if _human_confirmation_enabled():
             prop = execution_store.create(
@@ -1473,7 +1475,10 @@ def get_marketdata_status() -> str:
                     "ws": marketdata_ws_store.stats(),
                 },
                 "ws_streams": ws_manager.status(),
-                "private_streams": {"binance_user_stream": binance_user_streams.status()},
+                "private_streams": {
+                    "binance_user_stream": binance_user_streams.status(),
+                    "pollers": cex_private_updates.status(),
+                },
             }
         )
 
@@ -1532,8 +1537,9 @@ def start_cex_private_ws(exchange: str = "binance", market_type: str = "spot") -
     """
     Start an optional private order update websocket stream.
 
-    Currently supported:
-    - binance (spot and swap)
+    Implementation notes:
+    - binance uses a websocket user stream (spot + swap)
+    - other exchanges use an opt-in polling fallback (Phase 2) since CCXT Pro is not used here
     """
     return _with_observability(
         "start_cex_private_ws",
@@ -1548,12 +1554,23 @@ def _tool_start_cex_private_ws(exchange: str = "binance", market_type: str = "sp
     if PAPER_MODE:
         return _json_err("paper_mode_not_supported", "Private CEX streams are not supported in paper mode.")
     ex = (exchange or "").strip().lower()
-    if ex != "binance":
-        return _json_err("unsupported_exchange", "Private stream supported only for binance.", {"exchange": exchange})
     try:
         policy_engine.validate_cex_access(exchange_id=ex)
-        binance_user_streams.start(market_type=market_type)
-        return _json_ok({"started": True, "exchange": ex, "market_type": market_type})
+        if ex == "binance":
+            binance_user_streams.start(market_type=market_type)
+            return _json_ok({"started": True, "exchange": ex, "market_type": market_type, "mode": "ws"})
+        # Phase 2: for non-binance exchanges, use polling as a pragmatic private updates mechanism.
+        poll_interval = float(os.getenv("CEX_PRIVATE_POLL_INTERVAL_SEC", "2.0"))
+        cex_private_updates.start(exchange=ex, market_type=market_type, poll_interval_sec=poll_interval)
+        return _json_ok(
+            {
+                "started": True,
+                "exchange": ex,
+                "market_type": market_type,
+                "mode": "poll",
+                "poll_interval_sec": poll_interval,
+            }
+        )
     except PolicyError as e:
         return _json_err(e.code, e.message, e.data)
     except Exception as e:
@@ -1562,7 +1579,7 @@ def _tool_start_cex_private_ws(exchange: str = "binance", market_type: str = "sp
 
 @mcp.tool()
 def stop_cex_private_ws(exchange: str = "binance", market_type: str = "spot") -> str:
-    """Stop an optional private order update websocket stream (Phase 2.5)."""
+    """Stop an optional private order updates stream (ws for binance; poll fallback otherwise)."""
     return _with_observability(
         "stop_cex_private_ws",
         lambda: _tool_stop_cex_private_ws(exchange=exchange, market_type=market_type),
@@ -1574,18 +1591,19 @@ def _tool_stop_cex_private_ws(exchange: str = "binance", market_type: str = "spo
     if rl:
         return rl
     ex = (exchange or "").strip().lower()
-    if ex != "binance":
-        return _json_err("unsupported_exchange", "Private stream supported only for binance.", {"exchange": exchange})
     try:
-        binance_user_streams.stop(market_type=market_type)
-        return _json_ok({"stopped": True, "exchange": ex, "market_type": market_type})
+        if ex == "binance":
+            binance_user_streams.stop(market_type=market_type)
+            return _json_ok({"stopped": True, "exchange": ex, "market_type": market_type, "mode": "ws"})
+        cex_private_updates.stop(exchange=ex, market_type=market_type)
+        return _json_ok({"stopped": True, "exchange": ex, "market_type": market_type, "mode": "poll"})
     except Exception as e:
         return _json_err("private_ws_stop_error", str(e), {"exchange": ex, "market_type": market_type})
 
 
 @mcp.tool()
 def list_cex_private_updates(exchange: str = "binance", market_type: str = "spot", limit: int = 100) -> str:
-    """List recent private websocket events (best-effort, in-memory, bounded history)."""
+    """List recent private update events (best-effort, in-memory, bounded history)."""
     return _with_observability(
         "list_cex_private_updates",
         lambda: _tool_list_cex_private_updates(exchange=exchange, market_type=market_type, limit=limit),
@@ -1597,11 +1615,12 @@ def _tool_list_cex_private_updates(exchange: str = "binance", market_type: str =
     if rl:
         return rl
     ex = (exchange or "").strip().lower()
-    if ex != "binance":
-        return _json_err("unsupported_exchange", "Private updates supported only for binance.", {"exchange": exchange})
     try:
-        events = binance_user_streams.list_events(market_type=market_type, limit=int(limit))
-        return _json_ok({"exchange": ex, "market_type": market_type, "events": events})
+        if ex == "binance":
+            events = binance_user_streams.list_events(market_type=market_type, limit=int(limit))
+            return _json_ok({"exchange": ex, "market_type": market_type, "mode": "ws", "events": events})
+        events = cex_private_updates.list_events(exchange=ex, market_type=market_type, limit=int(limit))
+        return _json_ok({"exchange": ex, "market_type": market_type, "mode": "poll", "events": events})
     except Exception as e:
         return _json_err("private_ws_list_error", str(e), {"exchange": ex, "market_type": market_type})
 
@@ -1637,7 +1656,7 @@ def get_health() -> str:
         "idempotency_persistence_enabled": bool(
             (os.getenv("READYTRADER_IDEMPOTENCY_DB_PATH") or os.getenv("IDEMPOTENCY_DB_PATH") or "").strip()
         ),
-            "execution_proposal_persistence_enabled": execution_store.persistence_enabled(),
+        "execution_proposal_persistence_enabled": execution_store.persistence_enabled(),
     }
     return _json_ok(
         {
@@ -1645,7 +1664,10 @@ def get_health() -> str:
             "marketdata": {
                 "bus": marketdata_bus.status(),
                 "ws_streams": ws_manager.status(),
-                "private_streams": {"binance_user_stream": binance_user_streams.status()},
+                "private_streams": {
+                    "binance_user_stream": binance_user_streams.status(),
+                    "pollers": cex_private_updates.status(),
+                },
             },
             "metrics": {"uptime_sec": metrics.snapshot().get("uptime_sec")},
         }

@@ -139,10 +139,10 @@ python tools/generate_tool_docs.py
   - Start an optional private order update websocket stream.
 
 - **`stop_cex_private_ws(exchange='binance', market_type='spot')`**
-  - Stop an optional private order update websocket stream (Phase 2.5).
+  - Stop an optional private order updates stream (ws for binance; poll fallback otherwise).
 
 - **`list_cex_private_updates(exchange='binance', market_type='spot', limit=100)`**
-  - List recent private websocket events (best-effort, in-memory, bounded history).
+  - List recent private update events (best-effort, in-memory, bounded history).
 
 ### Research & evaluation
 

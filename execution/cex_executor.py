@@ -8,6 +8,7 @@ from typing import Any, Dict, Optional
 import ccxt
 
 from .models import normalize_ccxt_order, normalize_market_type
+from .retry import with_retry
 
 
 @dataclass
@@ -131,10 +132,10 @@ class CexExecutor:
 
     def fetch_balance(self) -> Dict[str, Any]:
         self._require_auth("fetch_balance")
-        return self._ex.fetch_balance()
+        return with_retry(f"{self.exchange_id}.fetch_balance", lambda: self._ex.fetch_balance())
 
     def _load_markets(self) -> Dict[str, Any]:
-        return self._ex.load_markets()
+        return with_retry(f"{self.exchange_id}.load_markets", lambda: self._ex.load_markets())
 
     def resolve_symbol(self, symbol: str) -> str:
         """
@@ -239,8 +240,14 @@ class CexExecutor:
         # ccxt: create_order(symbol, type, side, amount, price=None, params={})
         p = params or {}
         if t == "market":
-            return self._ex.create_order(s, t, sd, amount, None, p)
-        return self._ex.create_order(s, t, sd, amount, price, p)
+            return with_retry(
+                f"{self.exchange_id}.create_order",
+                lambda: self._ex.create_order(s, t, sd, amount, None, p),
+            )
+        return with_retry(
+            f"{self.exchange_id}.create_order",
+            lambda: self._ex.create_order(s, t, sd, amount, price, p),
+        )
 
     def cancel_order(self, *, order_id: str, symbol: Optional[str] = None) -> Dict[str, Any]:
         self._require_auth("cancel_order")
@@ -249,8 +256,11 @@ class CexExecutor:
                 self._load_markets()
             except Exception:
                 _ = False
-            return self._ex.cancel_order(order_id, self.resolve_symbol(symbol))
-        return self._ex.cancel_order(order_id)
+            return with_retry(
+                f"{self.exchange_id}.cancel_order",
+                lambda: self._ex.cancel_order(order_id, self.resolve_symbol(symbol)),
+            )
+        return with_retry(f"{self.exchange_id}.cancel_order", lambda: self._ex.cancel_order(order_id))
 
     def fetch_order(self, *, order_id: str, symbol: Optional[str] = None) -> Dict[str, Any]:
         self._require_auth("fetch_order")
@@ -259,27 +269,46 @@ class CexExecutor:
                 self._load_markets()
             except Exception:
                 _ = False
-            return self._ex.fetch_order(order_id, self.resolve_symbol(symbol))
-        return self._ex.fetch_order(order_id)
+            return with_retry(
+                f"{self.exchange_id}.fetch_order",
+                lambda: self._ex.fetch_order(order_id, self.resolve_symbol(symbol)),
+            )
+        return with_retry(f"{self.exchange_id}.fetch_order", lambda: self._ex.fetch_order(order_id))
 
     def fetch_open_orders(self, *, symbol: Optional[str] = None) -> list[Dict[str, Any]]:
         self._require_auth("fetch_open_orders")
         sym = self.resolve_symbol(symbol) if symbol else None
-        return self._ex.fetch_open_orders(sym) if sym else self._ex.fetch_open_orders()
+        if sym:
+            return with_retry(f"{self.exchange_id}.fetch_open_orders", lambda: self._ex.fetch_open_orders(sym))
+        return with_retry(f"{self.exchange_id}.fetch_open_orders", lambda: self._ex.fetch_open_orders())
 
     def fetch_orders(self, *, symbol: Optional[str] = None, limit: Optional[int] = None) -> list[Dict[str, Any]]:
         self._require_auth("fetch_orders")
         sym = self.resolve_symbol(symbol) if symbol else None
         if sym:
-            return self._ex.fetch_orders(sym, limit=limit) if limit else self._ex.fetch_orders(sym)
-        return self._ex.fetch_orders(limit=limit) if limit else self._ex.fetch_orders()
+            if limit:
+                return with_retry(
+                    f"{self.exchange_id}.fetch_orders",
+                    lambda: self._ex.fetch_orders(sym, limit=limit),
+                )
+            return with_retry(f"{self.exchange_id}.fetch_orders", lambda: self._ex.fetch_orders(sym))
+        if limit:
+            return with_retry(f"{self.exchange_id}.fetch_orders", lambda: self._ex.fetch_orders(limit=limit))
+        return with_retry(f"{self.exchange_id}.fetch_orders", lambda: self._ex.fetch_orders())
 
     def fetch_my_trades(self, *, symbol: Optional[str] = None, limit: Optional[int] = None) -> list[Dict[str, Any]]:
         self._require_auth("fetch_my_trades")
         sym = self.resolve_symbol(symbol) if symbol else None
         if sym:
-            return self._ex.fetch_my_trades(sym, limit=limit) if limit else self._ex.fetch_my_trades(sym)
-        return self._ex.fetch_my_trades(limit=limit) if limit else self._ex.fetch_my_trades()
+            if limit:
+                return with_retry(
+                    f"{self.exchange_id}.fetch_my_trades",
+                    lambda: self._ex.fetch_my_trades(sym, limit=limit),
+                )
+            return with_retry(f"{self.exchange_id}.fetch_my_trades", lambda: self._ex.fetch_my_trades(sym))
+        if limit:
+            return with_retry(f"{self.exchange_id}.fetch_my_trades", lambda: self._ex.fetch_my_trades(limit=limit))
+        return with_retry(f"{self.exchange_id}.fetch_my_trades", lambda: self._ex.fetch_my_trades())
 
     def normalize_order(self, order: Dict[str, Any]) -> Dict[str, Any]:
         return normalize_ccxt_order(exchange=self.exchange_id, market_type=self.market_type, order=order).to_dict()
@@ -292,7 +321,12 @@ class CexExecutor:
         if not self.supports("cancelAllOrders"):
             raise ValueError(f"{self.exchange_id} does not support cancelAllOrders")
         sym = self.resolve_symbol(symbol) if symbol else None
-        return self._ex.cancel_all_orders(sym) if sym else self._ex.cancel_all_orders()
+        if sym:
+            return with_retry(
+                f"{self.exchange_id}.cancel_all_orders",
+                lambda: self._ex.cancel_all_orders(sym),
+            )
+        return with_retry(f"{self.exchange_id}.cancel_all_orders", lambda: self._ex.cancel_all_orders())
 
     def replace_order(
         self,
@@ -315,5 +349,8 @@ class CexExecutor:
         t = order_type.strip().lower()
         sd = side.strip().lower()
         p = params or {}
-        return self._ex.edit_order(order_id, s, t, sd, amount, price, p)
+        return with_retry(
+            f"{self.exchange_id}.edit_order",
+            lambda: self._ex.edit_order(order_id, s, t, sd, amount, price, p),
+        )
 

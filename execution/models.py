@@ -36,7 +36,8 @@ def normalize_order_status(raw_status: Any) -> str:
     - unknown
     """
     s = str(raw_status or "").strip().lower()
-    if s in {"open", "new", "partially_filled", "partial", "partially-filled"}:
+    # Many exchanges use these variants for "open but not done".
+    if s in {"open", "new", "partially_filled", "partial", "partially-filled", "partial_fill", "partiallyfilled"}:
         return "open"
     if s in {"closed", "filled", "done"}:
         return "filled"
@@ -100,6 +101,15 @@ def normalize_ccxt_order(*, exchange: str, market_type: str, order: Dict[str, An
     Convert a CCXT order dict to our stable `NormalizedOrder`.
     """
     mt = normalize_market_type(market_type)
+    # Some exchanges omit fields; do lightweight derivation where safe.
+    amount = order.get("amount")
+    filled = order.get("filled")
+    remaining = order.get("remaining")
+    try:
+        if remaining is None and amount is not None and filled is not None:
+            remaining = float(amount) - float(filled)
+    except Exception:
+        remaining = order.get("remaining")
     return NormalizedOrder(
         exchange=exchange,
         id=str(order.get("id")) if order.get("id") is not None else None,
@@ -111,9 +121,9 @@ def normalize_ccxt_order(*, exchange: str, market_type: str, order: Dict[str, An
         side=str(order.get("side") or "").lower(),
         order_type=str(order.get("type") or "").lower(),
         status=normalize_order_status(order.get("status")),
-        amount=order.get("amount"),
-        filled=order.get("filled"),
-        remaining=order.get("remaining"),
+        amount=amount,
+        filled=filled,
+        remaining=remaining,
         price=order.get("price"),
         average=order.get("average"),
         cost=order.get("cost"),
