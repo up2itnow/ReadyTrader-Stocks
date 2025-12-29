@@ -362,4 +362,3 @@ Example `config_json`:
 - `docs/CUSTODY.md`: key custody + rotation guidance
 - `docs/POSITIONING.md`: credibility-safe marketing + messaging
 - `RELEASE_READINESS_CHECKLIST.md`: what must be green before distribution
-- `ROADMAP_10_OF_10.md`: phased plan to reach “10/10” maturity
