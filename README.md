@@ -26,6 +26,16 @@ The core philosophy of this project is a strict separation of powers:
 *   **The AI Agent (The Brain):** Decides *what* and *when* to trade. It can research historical data, scan social media, and simulate strategies, but it has no direct power to move money.
 *   **The MCP Server (The Guardrail):** Owns the API keys and enforces your safety policies. It filters every AI request through a "Risk Guardian" that rejects any trade that is too large, too risky, or violates your personal limits.
 
+## 💰 Funding Model (Non-Custodial)
+
+ReadyTrader-Stocks operates on a **User-Custodied** basis. This means:
+
+*   **You keep your funds**: Your capital remains in your own brokerage account (e.g., Alpaca, Tradier, request Interactive Brokers).
+*   **You control the keys**: You provide API keys that allow the agent to *trade* but (recommended) not *withdraw*.
+*   **Agent as Operator**: The agent acts as a remote operator. It sends order instructions to your broker using your keys, and the broker handles actual execution and settlement.
+
+> **Note**: In **Paper Mode** (default), we simulate a virtual wallet with fake funds so you can practice without linking a real brokerage.
+
 ## 🔄 A Day in the Life of a Trade
 
 1.  **Research:** You ask your agent, "Find a good entry for AAPL." The agent calls `fetch_ohlcv` and `get_sentiment`.
