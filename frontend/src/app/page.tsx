@@ -122,12 +122,12 @@ export default function Dashboard() {
         <h3>Active Strategies</h3>
         <div className="strategy-list">
           <div className="strategy-item">
-            <span>Grid Bot / BTC-USDT</span>
-            <span className="success">+1.2%</span>
+            <span>Trend Follower / AAPL</span>
+            <span className="success">+2.1%</span>
           </div>
           <div className="strategy-item">
-            <span>Trend Follower / ETH-USDT</span>
-            <span className="danger">-0.4%</span>
+            <span>Mean Reversion / TSLA</span>
+            <span className="danger">-1.4%</span>
           </div>
         </div>
       </section>

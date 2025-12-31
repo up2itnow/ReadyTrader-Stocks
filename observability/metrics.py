@@ -57,6 +57,15 @@ class Metrics:
             g = self._gauges.setdefault(name, _Gauge())
             g.value = float(value)
 
+    def record_trade_slippage(self, symbol: str, slippage_bps: float) -> None:
+        """Record slippage in basis points for a specific ticker."""
+        self.set_gauge(f"slippage_bps_{symbol}", slippage_bps)
+        self.inc(f"trades_total_{symbol}")
+
+    def record_market_event(self, event_type: str) -> None:
+        """Record market events like 'open', 'close', 'circuit_breaker'."""
+        self.inc(f"market_event_{event_type}")
+
     def snapshot(self) -> Dict[str, Any]:
         with self._lock:
             counters = {k: v.value for k, v in self._counters.items()}

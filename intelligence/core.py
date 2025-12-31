@@ -26,54 +26,58 @@ try:
 except ImportError:
     feedparser = None
 
-def get_fear_greed_index() -> str:
+def get_market_sentiment() -> str:
     """
-    Fetch the Crypto Fear & Greed Index from alternative.me.
+    Fetch market sentiment (Fear & Greed) for Stocks.
     """
     try:
-        url = "https://api.alternative.me/fng/"
-        response = requests.get(url, timeout=10)
+        # Using a reliable unofficial endpoint for CNN Fear & Greed index
+        # This provides the current value and the human-readable rating.
+        url = "https://production.dataviz.cnn.io/index/fearandgreed/static/latest"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        response = requests.get(url, headers=headers, timeout=10)
         data = response.json()
-        if 'data' in data and len(data['data']) > 0:
-            item = data['data'][0]
-            value = item['value']
-            classification = item['value_classification']
-            return f"Fear & Greed Index: {value} ({classification})"
-        return "Error: Could not retrieve Fear & Greed Index."
+        
+        value = data.get("fear_and_greed", {}).get("rating", "Unknown")
+        score = data.get("fear_and_greed", {}).get("now", 0.0)
+        
+        return f"CNN Fear & Greed: {value.upper()} ({round(score, 1)})"
     except Exception as e:
-        return f"Error fetching Fear & Greed Index: {str(e)}"
+        return f"Market Sentiment: Error fetching CNN Fear & Greed: {str(e)}. (Zero-Mock Policy: No simulated fallback provided)."
 
 def get_market_news() -> str:
     """
-    Fetch aggregated crypto market news using CryptoPanic API if available.
+    Fetch aggregated equity market news using Alpha Vantage.
     """
-    api_key = os.getenv("CRYPTOPANIC_API_KEY")
+    api_key = os.getenv("ALPHAVANTAGE_API_KEY")
     if not api_key:
-        return "Market News (Stub): API Key missing. Set CRYPTOPANIC_API_KEY in .env for real news."
+        return "Market News: ALPHAVANTAGE_API_KEY missing. News unavailable."
     
     try:
-        url = f"https://cryptopanic.com/api/v1/posts/?auth_token={api_key}&kind=news&filter=hot"
+        # Alpha Vantage News Sentiment endpoint
+        url = f"https://www.alphavantage.co/query?function=NEWS_SENTIMENT&apikey={api_key}"
         response = requests.get(url, timeout=10)
         data = response.json()
         
-        if 'results' in data:
-            headlines = [f"{i+1}. {p['title']}" for i, p in enumerate(data['results'][:5])]
-            return "CryptoPanic News:\n" + "\n".join(headlines)
-        return "Error: No news found via CryptoPanic."
+        if 'feed' in data:
+            headlines = [f"{i+1}. {p['title']} ({p['source']})" for i, p in enumerate(data['feed'][:5])]
+            return "Alpha Vantage news:\n" + "\n".join(headlines)
+        return "Error: No news found via Alpha Vantage."
     except Exception as e:
-        return f"Error fetching CryptoPanic news: {str(e)}"
+        return f"Error fetching news: {str(e)}"
 
 def fetch_rss_news(symbol: str = "") -> str:
     """
-    Fetch free market news from RSS feeds (CoinDesk, Cointelegraph).
-    This provides 'Free' news without requiring API keys.
+    Fetch free market news from RSS feeds.
     """
     if not feedparser:
         return "Error: feedparser library not installed. Cannot fetch RSS news."
     
     feeds = [
-        ("CoinDesk", "https://www.coindesk.com/arc/outboundfeeds/rss/"),
-        ("Cointelegraph", "https://cointelegraph.com/rss")
+        ("MarketWatch", "https://www.marketwatch.com/rss/marketupdate"),
+        ("Yahoo Finance", "https://finance.yahoo.com/news/rssindex")
     ]
     
     all_headlines = []
@@ -87,7 +91,7 @@ def fetch_rss_news(symbol: str = "") -> str:
                 if count >= 3:
                     break
                 # If symbol is provided, check if it's in the title/summary (case-insensitive)
-                if symbol and symbol.lower() not in entry.title.lower() and symbol.lower() not in entry.summary.lower():
+                if symbol and symbol.lower() not in entry.title.lower() and symbol.lower() not in (getattr(entry, 'summary', '')).lower():
                     continue
                 
                 all_headlines.append(f"{entry.title} ({name})")
@@ -96,9 +100,7 @@ def fetch_rss_news(symbol: str = "") -> str:
             all_headlines.append(f"Error fetching {name} feed: {str(e)}")
             
     if not all_headlines:
-        if symbol:
-            return f"No RSS news found matching '{symbol}' in recent feeds."
-        return "No RSS news found."
+        return f"No RSS news found matching '{symbol}' or feeds unavailable."
         
     return "Market News (Free RSS):\n" + "\n".join([f"{i+1}. {h}" for i, h in enumerate(all_headlines[:6])])
 
@@ -115,11 +117,12 @@ class SentimentCache:
                 return entry
         return None
 
-    def set(self, symbol: str, score: float, description: str):
+    def set(self, symbol: str, score: float, rationales: list[str]):
         self.cache[symbol] = {
             'time': time.time(),
-            'score': score,
-            'description': description
+            "score": round(score, 2),
+            "rationales": rationales,
+            "explainability_string": f"AI Sentiment of {round(score, 2)} based on: {'; '.join(rationales)}"
         }
 
 _sentiment_cache = SentimentCache()
@@ -140,10 +143,11 @@ def analyze_social_sentiment(symbol: str) -> str:
     # Let's refresh every time this tool is CALLED, but get_cached_sentiment_score uses what's there.
     
     score = 0.0
+    rationales = []
     
     # 1. Twitter / X Analysis
     twitter_bearer = os.getenv("TWITTER_BEARER_TOKEN")
-    twitter_result = "Twitter: API Key missing."
+    twitter_result = "Twitter: Not Configured."
     
     if twitter_bearer and tweepy:
         try:
@@ -154,55 +158,48 @@ def analyze_social_sentiment(symbol: str) -> str:
             if tweets.data:
                 texts = [t.text for t in tweets.data]
                 preview = " | ".join([t[:50] + "..." for t in texts[:2]])
-                twitter_result = f"Twitter (Real): Found {len(texts)} recent tweets. Preview: {preview}"
-                # Mock score calculation from real data
-                score += 0.2 # Arbitrary boost for finding volume
+                twitter_result = f"Twitter: Found {len(texts)} recent tweets. Preview: {preview}"
+                rationales.append(f"Twitter volume alert for {symbol}")
+                score += 0.2
             else:
-                twitter_result = "Twitter (Real): No recent tweets found."
+                twitter_result = "Twitter: No recent tweets found."
         except Exception as e:
             twitter_result = f"Twitter Error: {str(e)}"
 
     # 2. Reddit Analysis
     reddit_id = os.getenv("REDDIT_CLIENT_ID")
     reddit_secret = os.getenv("REDDIT_CLIENT_SECRET")
-    reddit_result = "Reddit: API Keys missing."
+    reddit_result = "Reddit: Not Configured."
     
     if reddit_id and reddit_secret and praw:
         try:
             reddit = praw.Reddit(
                 client_id=reddit_id,
                 client_secret=reddit_secret,
-                user_agent="agent_zero_crypto_bot/1.0"
+                user_agent="readytrader_stocks/1.0"
             )
-            # Search r/cryptocurrency
-            subreddit = reddit.subreddit("cryptocurrency")
+            # Search r/stocks or r/wallstreetbets
+            subreddit = reddit.subreddit("stocks+wallstreetbets")
             posts = subreddit.search(symbol, limit=5, time_filter="day")
             titles = [p.title for p in posts]
             if titles:
                 preview = " | ".join(titles[:2])
-                reddit_result = f"Reddit (Real): Found {len(titles)} posts in r/CC. Preview: {preview}"
+                reddit_result = f"Reddit: Found {len(titles)} posts. Preview: {preview}"
+                rationales.append(f"Reddit active discussion in r/stocks")
                 score += 0.2
             else:
-                reddit_result = "Reddit (Real): No recent posts found."
+                reddit_result = "Reddit: No recent posts found."
         except Exception as e:
             reddit_result = f"Reddit Error: {str(e)}"
             
     # Combine
     final_output = f"{twitter_result}\n{reddit_result}"
     
-    if "API Key missing" in twitter_result and "API Key missing" in reddit_result:
-        # Fallback to simulation
-        # In simulation, we generate a random score to simulate "Live" data changing
-        score = random.uniform(-0.5, 0.9)  # nosec B311
-        final_output = (
-            f"(Simulated) Social Sentiment for {symbol}: Score {score:.2f}.\n"
-            "SYSTEM NOTE: Real-time sentiment is currently disabled. To enable:\n"
-            "1. X (Twitter): Get a Bearer Token from https://developer.x.com/ and set TWITTER_BEARER_TOKEN\n"
-            "2. Reddit: Create an app at https://www.reddit.com/prefs/apps and set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET"
-        )
+    if "Not Configured" in twitter_result and "Not Configured" in reddit_result:
+        return "Social Sentiment: No providers configured (Twitter/Reddit API keys missing). (Zero-Mock Policy)."
     
     # Update Cache
-    _sentiment_cache.set(symbol, score, final_output)
+    _sentiment_cache.set(symbol, score, rationales)
     
     return final_output
 
@@ -213,15 +210,12 @@ def fetch_financial_news(symbol: str) -> str:
     """
     api_key = os.getenv("NEWSAPI_KEY")
     if not api_key or not NewsApiClient:
-         return (
-             "(Simulated) Financial News: Bloomberg reports positive outlook.\n"
-             "SYSTEM NOTE: To enable real high-tier financial news, get an API key from https://newsapi.org/ and set NEWSAPI_KEY in your .env file."
-         )
+         return "Financial News: NEWSAPI_KEY missing or NewsApiClient not installed. (Zero-Mock Policy)."
          
     try:
         newsapi = NewsApiClient(api_key=api_key)
-        # Search for symbol + crypto or finance
-        articles = newsapi.get_everything(q=f"{symbol} crypto", language='en', sort_by='relevancy', page_size=3)
+        # Search for symbol + stocks or finance
+        articles = newsapi.get_everything(q=f"{symbol} stock", language='en', sort_by='relevancy', page_size=3)
         
         if articles['status'] == 'ok' and articles['articles']:
             headlines = [f"{i+1}. {a['title']} ({a['source']['name']})" for i, a in enumerate(articles['articles'])]

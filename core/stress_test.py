@@ -9,7 +9,7 @@ import pandas as pd
 import ta
 from RestrictedPython import compile_restricted, safe_globals, utility_builtins
 
-from synthetic_market import generate_synthetic_ohlcv
+from marketdata.synthetic import generate_synthetic_ohlcv
 
 
 def _compile_strategy(strategy_code: str):

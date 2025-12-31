@@ -202,7 +202,8 @@ class PolicyEngine:
         """
         Optional safeguard: restrict signing to a known allowlist of addresses.
 
-        This helps prevent an operator accidentally pointing ReadyTrader-Crypto at the wrong signer/key.
+        This helps prevent an operator accidentally pointing ReadyTrader-Stocks
+ at the wrong signer/key.
         """
         addr = (address or "").strip().lower()
         allow = _parse_csv_set(os.getenv("ALLOW_SIGNER_ADDRESSES"))
@@ -303,7 +304,7 @@ class PolicyEngine:
                 data={},
             )
 
-    def validate_cex_order(
+    def validate_brokerage_order(
         self,
         *,
         exchange_id: str,
@@ -329,20 +330,20 @@ class PolicyEngine:
                 data={"exchange": exchange_id, "allow_exchanges": sorted(allow_exchanges)},
             )
 
-        allow_symbols = _parse_csv_set(os.getenv("ALLOW_CEX_SYMBOLS"))
+        allow_symbols = _parse_csv_set(os.getenv("ALLOW_BROKERAGE_SYMBOLS"))
         if allow_symbols and sym.lower() not in allow_symbols:
             raise PolicyError(
                 code="symbol_not_allowed",
-                message=f"Symbol '{symbol}' is not allowlisted for CEX.",
-                data={"symbol": symbol, "allow_cex_symbols": sorted(allow_symbols)},
+                message=f"Symbol '{symbol}' is not allowlisted for Brokerage.",
+                data={"symbol": symbol, "allow_brokerage_symbols": sorted(allow_symbols)},
             )
 
-        allow_market_types = _parse_csv_set(os.getenv("ALLOW_CEX_MARKET_TYPES"))
+        allow_market_types = _parse_csv_set(os.getenv("ALLOW_BROKERAGE_MARKET_TYPES"))
         if allow_market_types and mt not in allow_market_types:
             raise PolicyError(
                 code="market_type_not_allowed",
-                message=f"Market type '{market_type}' is not allowlisted for CEX.",
-                data={"market_type": market_type, "allow_cex_market_types": sorted(allow_market_types)},
+                message=f"Market type '{market_type}' is not allowlisted for Brokerage.",
+                data={"market_type": market_type, "allow_brokerage_market_types": sorted(allow_market_types)},
             )
 
         if sd not in {"buy", "sell"}:
@@ -358,15 +359,15 @@ class PolicyEngine:
         if ot == "limit" and (price is None or price <= 0):
             raise PolicyError("invalid_price", "price must be provided for limit orders and be > 0", {"price": price})
 
-        max_amt = (overrides or {}).get("MAX_CEX_ORDER_AMOUNT", _env_float("MAX_CEX_ORDER_AMOUNT", None))
+        max_amt = (overrides or {}).get("MAX_BROKERAGE_ORDER_AMOUNT", _env_float("MAX_BROKERAGE_ORDER_AMOUNT", None))
         if max_amt is not None and amount > max_amt:
             raise PolicyError(
                 code="order_amount_too_large",
-                message=f"Order amount {amount} exceeds MAX_CEX_ORDER_AMOUNT={max_amt}.",
-                data={"amount": amount, "max_cex_order_amount": max_amt},
+                message=f"Order amount {amount} exceeds MAX_BROKERAGE_ORDER_AMOUNT={max_amt}.",
+                data={"amount": amount, "max_brokerage_order_amount": max_amt},
             )
 
-    def validate_cex_access(self, *, exchange_id: str) -> None:
+    def validate_brokerage_access(self, *, exchange_id: str) -> None:
         ex = exchange_id.strip().lower()
         allow_exchanges = _parse_csv_set(os.getenv("ALLOW_EXCHANGES"))
         if allow_exchanges and ex not in allow_exchanges:

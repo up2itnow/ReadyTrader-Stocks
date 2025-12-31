@@ -1,4 +1,4 @@
-## ReadyTrader-Crypto Runbook (Docker-first)
+## ReadyTrader-Stocks Runbook (Equity-Focused)
 
 ### Common operations
 

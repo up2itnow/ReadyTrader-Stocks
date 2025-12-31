@@ -26,6 +26,13 @@ def register_trading_tools(mcp: FastMCP):
         return _json_ok({"result": global_container.paper_engine.deposit("agent_zero", asset, amount)})
 
     @mcp.tool()
+    def reset_paper_wallet() -> str:
+        """[PAPER MODE] Reset the paper trading wallet and trade history."""
+        if not settings.PAPER_MODE:
+            return _json_err("paper_mode_required", "Paper mode is NOT enabled.")
+        return _json_ok({"result": global_container.paper_engine.reset_wallet("agent_zero")})
+
+    @mcp.tool()
     def validate_trade_risk(side: str, symbol: str, amount_usd: float, portfolio_value: float) -> str:
         """[GUARDIAN] Validate if a trade is safe to execute."""
         try:

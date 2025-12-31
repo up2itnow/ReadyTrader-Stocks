@@ -3,18 +3,24 @@ from .core import (
     fetch_financial_news,
     fetch_rss_news,
     get_cached_sentiment_score,
-    get_fear_greed_index,
+    get_market_sentiment,
     get_market_news,
 )
 from .insights import InsightStore, MarketInsight
+from .technical_analysis import (
+    calculate_indicators,
+    calculate_vwap,
+)
 
 __all__ = [
     "analyze_social_sentiment",
     "fetch_financial_news",
     "fetch_rss_news",
     "get_cached_sentiment_score",
-    "get_fear_greed_index",
+    "get_market_sentiment",
     "get_market_news",
     "InsightStore",
     "MarketInsight",
+    "calculate_indicators",
+    "calculate_vwap",
 ]

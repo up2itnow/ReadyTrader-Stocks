@@ -1,8 +1,8 @@
 
 import pandas as pd
 
-from stress_test_engine import run_synthetic_stress_test
-from synthetic_market import generate_synthetic_ohlcv
+from core.stress_test import run_synthetic_stress_test
+from marketdata.synthetic import generate_synthetic_ohlcv
 
 
 def test_synthetic_market_determinism():

@@ -1,5 +1,5 @@
 mcp_servers:
-  readytrader_crypto:
+  readytrader_stocks:
     command: "docker"
     args:
       - "run"
@@ -7,5 +7,4 @@ mcp_servers:
       - "--rm"
       - "-e"
       - "PAPER_MODE=true"
-      - "readytrader-crypto"
-
+      - "readytrader-stocks"

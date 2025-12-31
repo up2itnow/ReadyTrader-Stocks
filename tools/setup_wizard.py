@@ -15,7 +15,7 @@ BOLD = "\033[1m"
 RESET = "\033[0m"
 
 def print_banner():
-    print(f"\n{BOLD}ReadyTrader-Crypto Setup Wizard 🛡️{RESET}")
+    print(f"\n{BOLD}ReadyTrader-Stocks Setup Wizard 🛡️{RESET}")
     print("-----------------------------------")
     print("This script will help you prepare your environment for AI-agentic trading.\n")
 

@@ -20,7 +20,7 @@ def on_candle(close, rsi, state):
             'volume': [1000.0] * 100
         })
 
-    result = backtest_engine.run(strategy, "BTC/USDT")
+    result = backtest_engine.run(strategy, "AAPL")
     assert "error" not in result
 
 def test_rce_prevention(backtest_engine):
@@ -36,7 +36,7 @@ def on_candle(close, rsi, state):
         columns=["timestamp", "open", "high", "low", "close", "volume"]
     )
 
-    result = backtest_engine.run(strategy, "BTC/USDT")
+    result = backtest_engine.run(strategy, "AAPL")
     assert "error" in result
     assert "Importing 'os' is forbidden" in result['error'] or "Compilation Error" in result['error']
 
@@ -61,5 +61,5 @@ def on_candle(close, rsi, state):
     )
     backtest_engine.fetch_ohlcv = lambda *args, **kwargs: df
 
-    result = backtest_engine.run(strategy, "BTC/USDT")
+    result = backtest_engine.run(strategy, "AAPL")
     assert "error" in result

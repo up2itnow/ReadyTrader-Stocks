@@ -136,7 +136,7 @@ class MarketDataBus:
         # symbol -> (last, ts_ms) for cheap outlier checks without fetching multiple sources
         self._last_good: Dict[str, Tuple[float, int]] = {}
 
-    def fetch_ticker(self, symbol: str) -> MarketDataResult:
+    async def fetch_ticker(self, symbol: str) -> MarketDataResult:
         sym = (symbol or "").strip().upper()
         now_ms = _now_ms()
 
@@ -152,10 +152,13 @@ class MarketDataBus:
         chosen: Optional[Dict[str, Any]] = None
         last_err: Exception | None = None
 
+        # To improve performance, we could fetch all in parallel, 
+        # but the logic here is sequential-failover based on priority.
+        # However, making it async allows the calling event loop to remain responsive.
         for p in providers:
             pid = p.provider_id
             try:
-                t = p.fetch_ticker(sym)
+                t = await p.fetch_ticker(sym)
                 ok, reason = _sane_ticker(t)
                 ts_ms = _extract_ts_ms(t)
                 age_ms = (now_ms - ts_ms) if ts_ms is not None else None
@@ -221,7 +224,7 @@ class MarketDataBus:
                 # refetch to return the full payload
                 p2 = next((p for p in providers if p.provider_id == best_pid), None)
                 if p2 is not None:
-                    best_ticker = p2.fetch_ticker(sym)
+                    best_ticker = await p2.fetch_ticker(sym)
                     best_ts = _extract_ts_ms(best_ticker)
                     best_age = (now_ms - best_ts) if best_ts is not None else None
                     chosen = {
@@ -280,13 +283,14 @@ class MarketDataBus:
         }
         return MarketDataResult(source=provider_id, data=ticker, meta=meta)
 
-    def fetch_ohlcv(self, symbol: str, timeframe: str, limit: int) -> MarketDataResult:
+    async def fetch_ohlcv(self, symbol: str, timeframe: str, limit: int) -> MarketDataResult:
         last_err: Exception | None = None
         for p in self._providers:
             try:
+                data = await p.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
                 return MarketDataResult(
                     source=p.provider_id,
-                    data=p.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit),
+                    data=data,
                     meta={"provider_id": p.provider_id},
                 )
             except Exception as e:

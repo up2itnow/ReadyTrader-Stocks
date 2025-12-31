@@ -4,7 +4,7 @@ import pandas as pd
 import ta
 from RestrictedPython import compile_restricted, safe_globals, utility_builtins
 
-from exchange_provider import ExchangeProvider
+from marketdata.exchange_provider import ExchangeProvider
 
 
 class BacktestEngine:

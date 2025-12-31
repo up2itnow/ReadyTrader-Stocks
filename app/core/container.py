@@ -1,16 +1,17 @@
 from app.core.config import settings
-from backtest_engine import BacktestEngine
-from dex_handler import DexHandler
-from exchange_provider import ExchangeProvider
-from execution.binance_user_stream import BinanceUserStreamManager
-from execution.private_updates import CexPrivateUpdateManager
-from execution_store import ExecutionStore
-from idempotency_store import IdempotencyStore
-from intelligence import InsightStore
-from learning import Learner
-from market_regime import RegimeDetector
+from core.backtest import BacktestEngine
+from marketdata.exchange_provider import ExchangeProvider
+from execution.store import ExecutionStore
+from common.idempotency import IdempotencyStore
+from intelligence.insights import InsightStore
+from intelligence.learning import Learner
+from execution.alpaca_service import AlpacaBrokerage
+from execution.tradier_service import TradierBrokerage
+from execution.ibkr_service import IBKRBrokerage
+from execution.retail_services import SchwabBrokerage, EtradeBrokerage, RobinhoodBrokerage
+from intelligence.regime import RegimeDetector
 from marketdata import (
-    CcxtMarketDataProvider,
+    StockMarketDataProvider,
     IngestMarketDataProvider,
     InMemoryMarketDataStore,
     MarketDataBus,
@@ -18,10 +19,10 @@ from marketdata import (
     load_marketdata_plugins,
 )
 from observability import AuditLog, Metrics
-from paper_engine import PaperTradingEngine
-from policy_engine import PolicyEngine
-from rate_limiter import FixedWindowRateLimiter
-from risk_manager import RiskGuardian
+from core.paper import PaperTradingEngine
+from core.policy import PolicyEngine
+from common.rate_limiter import FixedWindowRateLimiter
+from core.risk import RiskGuardian
 from signing import get_signer
 from strategy.marketplace import StrategyRegistry
 
@@ -51,18 +52,33 @@ class Container:
         self.marketdata_store = InMemoryMarketDataStore()
         self.marketdata_ws_store = InMemoryMarketDataStore()
         self.ws_manager = WsStreamManager(store=self.marketdata_ws_store, metrics=self.metrics)
-        self.binance_user_streams = BinanceUserStreamManager(metrics=self.metrics)
-        self.cex_private_updates = CexPrivateUpdateManager()
         
         self.marketdata_bus = MarketDataBus([
             IngestMarketDataProvider(store=self.marketdata_store),
             IngestMarketDataProvider(store=self.marketdata_ws_store, provider_id="exchange_ws"),
             *load_marketdata_plugins(),
-            CcxtMarketDataProvider(exchange_provider=self.exchange_provider),
+            StockMarketDataProvider(exchange_provider=self.exchange_provider),
         ])
         
-        self.dex_handler = DexHandler()
-        self.signer = get_signer()
+        # Brokerages
+        self.alpaca_brokerage = AlpacaBrokerage()
+        self.tradier_brokerage = TradierBrokerage()
+        self.ibkr_brokerage = IBKRBrokerage()
+        self.schwab_brokerage = SchwabBrokerage()
+        self.etrade_brokerage = EtradeBrokerage()
+        self.robinhood_brokerage = RobinhoodBrokerage()
+        
+        # Mapping for easy lookup
+        self.brokerages = {
+            "alpaca": self.alpaca_brokerage,
+            "tradier": self.tradier_brokerage,
+            "ibkr": self.ibkr_brokerage,
+            "schwab": self.schwab_brokerage,
+            "etrade": self.etrade_brokerage,
+            "robinhood": self.robinhood_brokerage
+        }
+        
+        self.signer = None # get_signer()
         self.learner = Learner(db_path=self.paper_engine.db_path) if settings.PAPER_MODE and self.paper_engine else None
 
 global_container = Container()

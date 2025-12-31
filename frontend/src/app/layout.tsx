@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ReadyTrader | Institutional AI Trading",
-  description: "High-performance AI agent trading dashboard",
+  title: "ReadyTrader | Institutional AI Stock Trading",
+  description: "High-performance AI agent stock trading dashboard",
 };
 
 export default function RootLayout({
@@ -17,7 +17,7 @@ export default function RootLayout({
         <div className="layout-root">
           <aside className="sidebar">
             <div className="logo-container">
-              <span className="logo-text">READY<span>TRADER</span></span>
+              <span className="logo-text">REAL<span>TRADER</span></span>
             </div>
             <nav className="main-nav">
               <a href="/" className="nav-item active">Dashboard</a>

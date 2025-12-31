@@ -10,8 +10,8 @@ Please report details privately with:
 - Any relevant **logs** or **screenshots** (redact secrets)
 
 ### Scope Notes
-- This project can be configured for **live trading** (`PAPER_MODE=false`). Keep secrets out of source control.
-- This project uses a **signer abstraction**; prefer keystore-based signing over raw private keys.
+- This project can be configured for **live trading** (`PAPER_MODE=false`). Keep API keys and secrets out of source control.
+- This project uses a **credential provider abstraction**; prefer environment-based or vault-based secrets over raw credentials in code.
 - For live trading deployments, review `docs/THREAT_MODEL.md` and follow least-privilege patterns.
 
 ### Secret scanning guidance

@@ -1,11 +1,11 @@
-# ReadyTrader-Crypto
+# ReadyTrader-Stocks
 
-[![CI](https://github.com/up2itnow/ReadyTrader-Crypto/actions/workflows/ci.yml/badge.svg)](https://github.com/up2itnow/ReadyTrader-Crypto/actions/workflows/ci.yml)
+[![CI](https://github.com/up2itnow/ReadyTrader-Stocks/actions/workflows/ci.yml/badge.svg)](https://github.com/up2itnow/ReadyTrader-Stocks/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ## Important Disclaimer (Read Before Use)
 
-ReadyTrader-Crypto is provided for informational and educational purposes only and does not constitute financial, investment, legal, or tax advice. Trading digital assets involves substantial risk and may result in partial or total loss of funds. Past performance is not indicative of future results. You are solely responsible for any decisions, trades, configurations, supervision, and the security of your keys/credentials. ReadyTrader-Crypto is provided “AS IS”, without warranties of any kind, and we make no guarantees regarding profitability, performance, availability, or outcomes. By using ReadyTrader-Crypto, you acknowledge and accept these risks.
+ReadyTrader-Stocks is provided for informational and educational purposes only and does not constitute financial, investment, legal, or tax advice. Trading stocks and equities involves substantial risk and may result in partial or total loss of funds. Past performance is not indicative of future results. You are solely responsible for any decisions, trades, configurations, supervision, and the security of your credentials/API keys. ReadyTrader-Stocks is provided “AS IS”, without warranties of any kind, and we make no guarantees regarding profitability, performance, availability, or outcomes. By using ReadyTrader-Stocks, you acknowledge and accept these risks.
 
 See also: `DISCLAIMER.md`.
 
@@ -15,9 +15,9 @@ See also: `DISCLAIMER.md`.
 
 ## 🌎 The Big Picture
 
-**ReadyTrader-Crypto** is a specialized bridge that turns your AI Agent (like Gemini or Claude) into a professional crypto trading operator. 
+**ReadyTrader-Stocks** is a specialized bridge that turns your AI Agent (like Gemini or Claude) into a professional stock trading operator. 
 
-Think of it this way: Your AI agent provides the **Intelligence** (analyzing charts, news, and sentiment), while ReadyTrader-Crypto provides the **Hands** (connecting to exchanges) and the **Safety Brakes** (enforcing your risk rules). It allows you to delegate complex trading tasks to an AI without giving it unchecked access to your funds.
+Think of it this way: Your AI agent provides the **Intelligence** (analyzing charts, earnings reports, and news sentiment), while ReadyTrader-Stocks provides the **Hands** (connecting to brokerages and data providers) and the **Safety Brakes** (enforcing your risk rules). It allows you to delegate complex trading tasks to an AI without giving it unchecked access to your capital.
 
 ## 🛡️ The Trust Model: Intelligence vs. Execution
 
@@ -28,16 +28,16 @@ The core philosophy of this project is a strict separation of powers:
 
 ## 🔄 A Day in the Life of a Trade
 
-1.  **Research:** You ask your agent, "Find a good entry for BTC." The agent calls `fetch_ohlcv` and `get_sentiment`.
-2.  **Proposal:** The agent concludes, "BTC is oversold; I want to buy $100." It calls `place_limit_order`.
-3.  **Governance:** The MCP server checks its rules. Is $100 within your `MAX_TRADE_AMOUNT`? If yes, it creates a **Pending Execution**.
-4.  **Consent:** If you've enabled "Human-in-the-loop," the agent notifies you. You click **Confirm** in the [Web UI](#-optional-web-ui), and only then does the trade hit the exchange.
+1.  **Research:** You ask your agent, "Find a good entry for AAPL." The agent calls `fetch_ohlcv` and `get_sentiment`.
+2.  **Proposal:** The agent concludes, "AAPL is oversold; I want to buy $1000 worth of shares." It calls `place_market_order`.
+3.  **Governance:** The MCP server checks its rules. Is $1000 within your `MAX_TRADE_AMOUNT`? If yes, it creates a **Pending Execution**.
+4.  **Consent:** If you've enabled "Human-in-the-loop," the agent notifies you. You click **Confirm** in the [Web UI](#-optional-web-ui), and only then does the trade hit the market.
 
 ---
 
 ### 🖥️ Premium Next.js Dashboard
 
-`ReadyTrader-Crypto` includes a professional Next.js dashboard for real-time monitoring, multi-agent coordination, and trade approvals.
+`ReadyTrader-Stocks` includes a professional Next.js dashboard for real-time monitoring, multi-agent coordination, and trade approvals.
 
 **How to Enable:**
 1.  Navigate to the directory: `cd frontend`
@@ -77,7 +77,7 @@ You’ll get exportable artifacts under `artifacts/demo_stress/` (gitignored).
 
 Prompt pack (copy/paste): `prompts/READYTRADER_PROMPT_PACK.md`.
 
-![ReadyTrader-Crypto demo flow](docs/assets/demo-flow.svg)
+![ReadyTrader-Stocks demo flow](docs/assets/demo-flow.svg)
 
 ## 🛠️ Installation & Setup
 
@@ -87,14 +87,14 @@ Prompt pack (copy/paste): `prompts/READYTRADER_PROMPT_PACK.md`.
 ### 1. Build & Run (Standalone)
 Run the server in a container. It exposes stdio for MCP clients.
 ```bash
-cd ReadyTrader-Crypto
-docker build -t readytrader-crypto .
+cd ReadyTrader-Stocks
+docker build -t readytrader-stocks .
 # Run interactively (to test)
-docker run --rm -i readytrader-crypto
+docker run --rm -i readytrader-stocks
 ```
 
 ### Local development (no Docker)
-If you want to run or test ReadyTrader-Crypto locally:
+If you want to run or test ReadyTrader-Stocks locally:
 
 ```bash
 pip install -r requirements-dev.txt
@@ -153,31 +153,21 @@ Create a `.env` file or pass environment variables. Start from `env.example` (co
 
 ---
 
-#### CEX credentials (Phase 3)
-To place CEX orders or fetch CEX balances, configure ccxt credentials via env.
+#### Brokerage credentials
+To place live orders or fetch balances, configure brokerage credentials via env.
 
-Generic (applies to the default exchange you pass to the tool):
-* `CEX_API_KEY=...`
-* `CEX_API_SECRET=...`
-* `CEX_API_PASSWORD=...` (optional; some exchanges)
-
-Or per-exchange (preferred):
-* `CEX_BINANCE_API_KEY=...`
-* `CEX_BINANCE_API_SECRET=...`
-* `CEX_BINANCE_API_PASSWORD=...` (optional)
+* `ALPACA_API_KEY=...`
+* `ALPACA_API_SECRET=...`
+* `TRADIER_ACCESS_TOKEN=...`
 
 Tools:
-* `place_cex_order(symbol, side, amount, order_type='market', price=None, exchange='binance', market_type='spot', idempotency_key='')`
-* `get_cex_balance(exchange='binance', market_type='spot')`
-* `get_cex_order(order_id, symbol='', exchange='binance', market_type='spot')`
-* `cancel_cex_order(order_id, symbol='', exchange='binance', market_type='spot')`
-* `get_cex_capabilities(exchange='binance', symbol='', market_type='spot')`
-* `list_cex_open_orders(exchange='binance', symbol='', market_type='spot', limit=100)`
-* `list_cex_orders(exchange='binance', symbol='', market_type='spot', limit=100)`
-* `get_cex_my_trades(exchange='binance', symbol='', market_type='spot', limit=100)`
-* `cancel_all_cex_orders(exchange='binance', symbol='', market_type='spot')`
-* `replace_cex_order(exchange, order_id, symbol, side, amount, order_type='limit', price=None, market_type='spot')`
-* `wait_for_cex_order(exchange, order_id, symbol='', market_type='spot', timeout_sec=30, poll_interval_sec=2.0)`
+* `place_stock_order(symbol, side, amount, order_type='market', price=0.0, exchange='alpaca', rationale='')`
+* `get_portfolio_balance()`
+* `reset_paper_wallet()` - **New: Reset all simulated data**
+* `deposit_paper_funds(asset, amount)` - **New: Add virtual cash**
+
+Market-data introspection:
+* `get_marketdata_capabilities(exchange_id='')`
 
 Market-data introspection:
 * `get_marketdata_capabilities(exchange_id='')`
@@ -188,22 +178,22 @@ Market-data introspection:
 
 ### Option A: Agent Zero (Recommended)
 To give Agent Zero these powers, add the following to your **Agent Zero Settings** (or `agent.yaml`).
-The MCP server key/name is arbitrary; we use `readytrader_crypto` in examples.
+The MCP server key/name is arbitrary; we use `readytrader_stocks` in examples.
 
 Quick copy/paste file: `configs/agent_zero.mcp.yaml`.
 
 **Via User Interface:**
 1.  Go to **Settings** -> **MCP Servers**.
 2.  Add a new server:
-    *   **Name**: `readytrader_crypto`
+    *   **Name**: `readytrader_stocks`
     *   **Type**: `stdio`
     *   **Command**: `docker`
-    *   **Args**: `run`, `-i`, `--rm`, `-e`, `PAPER_MODE=true`, `readytrader`
+    *   **Args**: `run`, `-i`, `--rm`, `-e`, `PAPER_MODE=true`, `readytrader-stocks`
 
 **Via `agent.yaml`:**
 ```yaml
 mcp_servers:
-  readytrader_crypto:
+  readytrader_stocks:
     command: "docker"
     args: 
       - "run"
@@ -211,7 +201,7 @@ mcp_servers:
       - "--rm"
       - "-e"
       - "PAPER_MODE=true"
-      - "readytrader-crypto"
+      - "readytrader-stocks"
 ```
 Prebuilt config: `configs/agent_zero.mcp.yaml`.
 *Restart Agent Zero after saving.*
@@ -224,14 +214,14 @@ Quick copy/paste file: `configs/claude_desktop.mcp-server-config.json`.
 ```json
 {
   "mcpServers": {
-    "readytrader_crypto": {
+    "readytrader_stocks": {
       "command": "docker",
       "args": [
         "run", 
         "-i", 
         "--rm", 
         "-e", "PAPER_MODE=true", 
-        "readytrader-crypto"
+        "readytrader-stocks"
       ]
     }
   }
@@ -243,27 +233,26 @@ Prebuilt config: `configs/claude_desktop.mcp-server-config.json`.
 
 ## 📚 Feature Guide
 
-### 1. The Strategy Builder (Backtesting)
-Your agent can "research" before it trades. Ask it to **develop and test** a strategy.
-
 **Example Prompt:**
-> "Create a mean-reversion strategy for BTC/USDT. Write a Python function `on_candle` that uses RSI. Run a backtest simulation on the last 500 hours and tell me the Win Rate and PnL."
+> "Create a mean-reversion strategy for AAPL. Write a Python function `on_candle` that uses RSI. Run a backtest simulation on the last 500 hours and tell me the Win Rate and PnL."
 
 **What happens:**
-1.  Agent calls `fetch_ohlcv("BTC/USDT")` to see data structure.
+1.  Agent calls `fetch_ohlcv("AAPL")` to see data structure.
 2.  Agent writes code for `on_candle(close, rsi, state)`.
-3.  Agent calls `run_backtest_simulation(code, "BTC/USDT")`.
+3.  Agent calls `run_backtest_simulation(code, "AAPL")`.
 4.  Server runs the code in a sandbox and returns `{ "pnl": 15.5%, "win_rate": 60% }`.
 
-### 2. Paper Trading Laboratory
-Perfect for "interning" your agent.
-*   **Deposit Funds**: `deposit_paper_funds("USDC", 10000)`
-*   **Place Orders**: `place_limit_order("buy", "ETH/USDT", 1.0, 2500.0)`
-*   **Check Status**: `get_address_balance(..., "paper")`
+### 2. Paper Trading Laboratory (Zero-Key Flow)
+Perfect for "interning" your agent without any paid API keys.
+*   **Fund your account**: `deposit_paper_funds("USD", 100000)`
+*   **Researching Stocks**: Use `fetch_ohlcv` and `get_stock_price` (powered by public `yfinance` data).
+*   **Analyze Sentiment**: `fetch_rss_news` (MarketWatch/Yahoo Finance) provides real-time "Free" signals.
+*   **Place Orders**: `place_market_order("AAPL", "buy", 10)`
+*   **Reset Everything**: `reset_paper_wallet()`
 
 ### 3. Market Regime & Risk
 The agent can query the "weather" before flying.
-*   **Tool**: `get_market_regime("BTC/USDT")`
+*   **Tool**: `get_market_regime("AAPL")`
 *   **Output**: `{"regime": "TRENDING", "direction": "UP", "adx": 45.2}`
 *   **Agent Logic**: "The market is Trending Up (ADX > 25). I will switch to my Trend-Following Strategy and disable Mean-Reversion."
 
@@ -277,16 +266,16 @@ For the complete (generated) tool catalog with signatures and docstrings, see: `
 
 | Category | Tool | Description |
 | :--- | :--- | :--- |
-| **Market Data** | `get_crypto_price` | Live price from CEX. |
+| **Market Data** | `get_stock_price` | Live price from brokerage/data provider. |
 | | `fetch_ohlcv` | Historical candles for research. |
 | | `get_market_regime` | **Trend/Chop Detection** (Phase 6). |
-| **Intelligence** | `get_sentiment` | Fear & Greed Index. |
-| | `get_social_sentiment` | X/Reddit Analysis (Simulated). |
-| | `get_financial_news` | Bloomberg/Reuters (Simulated). |
-| **Trading** | `swap_tokens` | Execute market order swap. |
+| **Intelligence** | `get_sentiment` | Fear & Greed Index (Market). |
+| | `get_social_sentiment` | X/Reddit Analysis (Financial focus). |
+| | `get_financial_news` | Bloomberg/Reuters (Simulated/Real). |
+| **Trading** | `place_market_order` | Execute market order. |
 | | `place_limit_order` | **Limit Order** (Paper Mode). |
 | | `check_orders` | Update Order Book (Paper Mode). |
-| **Account** | `get_address_balance`| Check Wallet Balance. |
+| **Account** | `get_portfolio_balance`| Check Account Balance. |
 | | `deposit_paper_funds`| Get fake money (Paper Mode). |
 | **Research** | `run_backtest_simulation` | **Run Strategy Backtest**. |
 | **Research** | `run_synthetic_stress_test` | Run **synthetic black-swan stress test** with deterministic replay + recommendations. |

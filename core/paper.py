@@ -158,11 +158,25 @@ class PaperTradingEngine:
         conn.close()
         return f"Paper wallet and history for {user_id} have been reset."
 
+    def _parse_symbol(self, symbol: str) -> tuple[str, str]:
+        """
+        Parse symbol into (base, quote).
+        If no slash, assume it's a Stock ticker quoted in USD.
+        e.g. "AAPL" -> ("AAPL", "USD")
+        e.g. "BTC/USDT" -> ("BTC", "USDT")
+        """
+        s = symbol.strip().upper()
+        if '/' in s:
+            parts = s.split('/', 1)
+            return parts[0], parts[1]
+        # For stocks, base is the ticker, quote is USD
+        return s, "USD"
+
     def place_limit_order(self, user_id: str, side: str, symbol: str, amount: float, price: float) -> str:
         """
         Place a limit order. Reserve funds immediately.
         """
-        base, quote = symbol.split('/')
+        base, quote = self._parse_symbol(symbol)
         total_value = amount * price
         
         # Check simulated balance and reserve
@@ -208,6 +222,7 @@ class PaperTradingEngine:
         orders = c.fetchall()
         
         filled_msgs = []
+        base, quote = self._parse_symbol(symbol)
         
         for order in orders:
             oid, uid, side, amt, price, val = order
@@ -216,25 +231,18 @@ class PaperTradingEngine:
             if side == 'buy' and current_price <= price:
                 fill = True
                 # Give user the Base asset (Quote was deducted at placement)
-                base = symbol.split('/')[0]
                 self.deposit(uid, base, amt)
                 
             elif side == 'sell' and current_price >= price:
                 fill = True
                 # Give user the Quote asset (Base was deducted at placement)
-                # But wait, we need to calculate value based on LIMIT price or CURRENT price?
-                # Standard limit order matches at limit or better.
-                # In paper sim, let's settle at the limit price for simplicity (or we can give them the surplus).
-                quote = symbol.split('/')[1]
                 self.deposit(uid, quote, val) # val was amt * limit_price
                 
             if fill:
                 c.execute("UPDATE orders SET status='filled' WHERE id=?", (oid,))
                 filled_msgs.append(f"Order #{oid} FILLED: {side.upper()} {amt} {symbol} @ {price}")
                 # Update derived price cache from the fill price (best available for metrics)
-                base, quote = symbol.split('/')
                 self._set_asset_price_usd(quote, 1.0 if quote.upper() in {"USDT", "USDC", "DAI", "USD"} else 1.0)
-                # If quote is stable, base USD price = quote_per_base (limit price)
                 if quote.upper() in {"USDT", "USDC", "DAI", "USD"}:
                     self._set_asset_price_usd(base, float(price))
                 self._snapshot_equity(uid)
@@ -254,13 +262,17 @@ class PaperTradingEngine:
     ) -> str:
         """
         Execute a paper trade.
-        side: 'buy' or 'sell'
-        symbol: e.g. 'BTC/USDT'
-        amount: amount of base asset (BTC)
-        price: price in quote asset (USDT)
-        rationale: reason for the trade
         """
-        base, quote = symbol.split('/')
+        base, quote = self._parse_symbol(symbol)
+        
+        # If price is 0, try to fetch it from cache or mock
+        if price <= 0:
+            cached_price = self._get_asset_price_usd(base)
+            if cached_price is None:
+                raise ValueError(f"Price for {base} is unknown and pulse price was not provided. Execution failed (Zero-Mock Policy).")
+            price = cached_price
+        
+            
         total_value = amount * price
         
         # Check simulated balance
@@ -296,7 +308,6 @@ class PaperTradingEngine:
         conn.close()
 
         # Update derived price cache (if quote looks like USD stable)
-        base, quote = symbol.split('/')
         if quote.upper() in {"USDT", "USDC", "DAI", "USD"}:
             self._set_asset_price_usd(base, float(price))
             self._set_asset_price_usd(quote, 1.0)

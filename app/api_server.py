@@ -17,7 +17,7 @@ from observability import build_log_context, log_event
 # Initial context
 API_CTX = build_log_context(tool="api_server")
 
-app = FastAPI(title="ReadyTrader-Crypto Modern API")
+app = FastAPI(title="ReadyTrader-Stocks Modern API")
 
 # Enable CORS for Next.js frontend
 app.add_middleware(
@@ -102,11 +102,54 @@ async def approve_trade(req: ApprovalRequest):
     """
     try:
         if req.approve:
-            # TODO: Re-implement approval execution logic via global_container tools
-            raise HTTPException(status_code=501, detail="Approval execution not yet ported to modular app")
+            # 1. Confirm the proposal in the store (validates token and expiration)
+            try:
+                proposal = global_container.execution_store.confirm(req.request_id, req.confirm_token)
+            except ValueError as ve:
+                raise HTTPException(status_code=400, detail=str(ve))
+            
+            # 2. Execute based on kind
+            if proposal.kind == "stock_order":
+                p = proposal.payload
+                
+                if settings.PAPER_MODE:
+                    res = global_container.paper_engine.execute_trade(
+                        user_id="agent_zero",
+                        side=p["side"],
+                        symbol=p["symbol"],
+                        amount=p["amount"],
+                        price=p.get("price", 0.0),
+                        rationale=p.get("rationale", "api_approved")
+                    )
+                    return {"ok": True, "result": res}
+                else:
+                    # Live Brokerage Execution
+                    exchange = p.get("exchange", "alpaca").lower()
+                    if exchange not in global_container.brokerages:
+                        raise HTTPException(status_code=400, detail=f"Brokerage {exchange} is not supported.")
+                    
+                    brokerage = global_container.brokerages[exchange]
+                    if not brokerage.is_available():
+                        raise HTTPException(status_code=400, detail=f"Brokerage {exchange} is not configured with API keys.")
+                    
+                    try:
+                        res = brokerage.place_order(
+                            symbol=p["symbol"],
+                            side=p["side"],
+                            qty=p["amount"],
+                            order_type=p.get("order_type", "market"),
+                            price=p.get("price") if p.get("price", 0) > 0 else None
+                        )
+                        return {"ok": True, "result": res}
+                    except Exception as e:
+                        raise HTTPException(status_code=500, detail=f"Execution error: {str(e)}")
+            
+            return {"ok": False, "error": "Unknown proposal kind"}
         else:
             success = global_container.execution_store.cancel(req.request_id)
             return {"ok": success}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

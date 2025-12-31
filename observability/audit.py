@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
 import json
 import os
@@ -52,17 +53,26 @@ class AuditLog:
         conn = self._get_conn()
         if conn is None:
             return
-        payload = json.dumps(summary or {}, sort_keys=True)
-        # Week 4: Hashing Logic (stubbed for now, previous_hash=NULL)
-        # Ideally, we fetch the hash of the last row and hash it with current data.
+        
+        # Use compact separators for hashing to ensure stability across environments
+        payload = self._serialize_payload(summary)
         
         with self._lock:
+            # Fetch the hash of the last entry to chain them together
+            cursor = conn.execute("SELECT hash FROM audit_events ORDER BY id DESC LIMIT 1")
+            last_row = cursor.fetchone()
+            prev_hash = last_row[0] if last_row else "INITIAL_HASH"
+            
+            # Create a string to hash: combine previous hash with current entry data
+            data_to_hash = f"{prev_hash}|{ts_ms}|{request_id}|{tool}|{1 if ok else 0}|{payload}"
+            current_hash = hashlib.sha256(data_to_hash.encode()).hexdigest()
+            
             conn.execute(
                 """
                 INSERT INTO audit_events(
-                    ts_ms, request_id, tool, ok, error_code, mode, venue, exchange, market_type, summary_json
+                    ts_ms, request_id, tool, ok, error_code, mode, venue, exchange, market_type, summary_json, hash, previous_hash
                 )
-                VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     int(ts_ms),
@@ -75,9 +85,41 @@ class AuditLog:
                     exchange,
                     market_type,
                     payload,
+                    current_hash,
+                    prev_hash
                 ),
             )
             conn.commit()
+
+    def verify_integrity(self) -> bool:
+        """
+        Verify the cryptographic integrity of the entire audit log.
+        """
+        conn = self._get_conn()
+        if conn is None:
+            return True
+        
+        with self._lock:
+            cursor = conn.execute("SELECT ts_ms, request_id, tool, ok, summary_json, hash, previous_hash FROM audit_events ORDER BY id ASC")
+            rows = cursor.fetchall()
+            
+            last_hash = "INITIAL_HASH"
+            for row in rows:
+                ts_ms, req_id, tool, ok, summary, cur_hash, prev_hash = row
+                if prev_hash != last_hash:
+                    return False
+                
+                # Recompute hash using same logic
+                data_to_hash = f"{prev_hash}|{ts_ms}|{req_id}|{tool}|{ok}|{summary}"
+                computed = hashlib.sha256(data_to_hash.encode()).hexdigest()
+                if computed != cur_hash:
+                    return False
+                last_hash = cur_hash
+                
+        return True
+
+    def _serialize_payload(self, summary: Dict[str, Any] | None) -> str:
+        return json.dumps(summary or {}, sort_keys=True, separators=(',', ':'))
     
     def export_tax_report(self) -> str:
         """
@@ -171,10 +213,19 @@ class AuditLog:
                         venue TEXT,
                         exchange TEXT,
                         market_type TEXT,
-                        summary_json TEXT NOT NULL
+                        summary_json TEXT NOT NULL,
+                        hash TEXT,
+                        previous_hash TEXT
                     )
                     """
                 )
+                # Ensure existing databases are migrated if they don't have the hash column
+                try:
+                    self._conn.execute("ALTER TABLE audit_events ADD COLUMN hash TEXT")
+                    self._conn.execute("ALTER TABLE audit_events ADD COLUMN previous_hash TEXT")
+                except sqlite3.OperationalError:
+                    # Columns already exist
+                    pass
                 self._conn.commit()
             return self._conn
 

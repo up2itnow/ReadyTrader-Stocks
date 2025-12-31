@@ -1,6 +1,6 @@
 
 from app.core.container import global_container
-from rate_limiter import FixedWindowRateLimiter
+from common.rate_limiter import FixedWindowRateLimiter
 
 
 def test_rate_limiting_blocks_after_limit():

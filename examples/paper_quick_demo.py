@@ -27,7 +27,7 @@ def main() -> int:
     if str(root) not in sys.path:
         sys.path.insert(0, str(root))
 
-    from paper_engine import PaperTradingEngine
+    from core.paper import PaperTradingEngine
 
     with tempfile.TemporaryDirectory() as td:
         db_path = str(Path(td) / "paper_demo.db")

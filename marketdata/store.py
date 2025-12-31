@@ -4,7 +4,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
-from cache import TTLCache
+from common.cache import TTLCache
 
 
 @dataclass(frozen=True)

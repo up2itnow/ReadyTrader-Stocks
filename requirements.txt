@@ -1,11 +1,10 @@
-# Top-level runtime dependencies.
-# For a fully pinned transitive lock, see: requirements.lock.txt
 fastmcp==2.14.1
-ccxt==4.5.29
-web3==7.14.0
+yfinance
+alpaca-trade-api-python
 python-dotenv==1.2.1
 requests==2.32.5
 pandas==2.3.3
+pandas_ta
 ta==0.11.0
 tweepy==4.16.0
 praw==7.8.1

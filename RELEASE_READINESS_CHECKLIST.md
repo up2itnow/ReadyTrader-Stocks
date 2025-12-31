@@ -1,4 +1,4 @@
-## ReadyTrader-Crypto — Release Readiness Checklist
+## ReadyTrader-Stocks — Release Readiness Checklist
 
 This checklist is meant to be used before any public release or major announcement. It focuses on trust, safety, and reproducibility.
 
