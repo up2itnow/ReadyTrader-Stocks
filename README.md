@@ -98,7 +98,7 @@ If you want to run or test ReadyTrader-Crypto locally:
 
 ```bash
 pip install -r requirements-dev.txt
-fastmcp run server.py
+python app/main.py
 ```
 
 ### 2. Configuration (`.env`)
@@ -323,7 +323,7 @@ Example `config_json`:
 
 ## 📌 Project docs
 - `docs/README.md`: docs index / navigation
-- `docs/TOOLS.md`: complete tool catalog (generated from `server.py`)
+- `docs/TOOLS.md`: complete tool catalog (generated from `app/tools`)
 - `docs/ERRORS.md`: common error codes and operator troubleshooting
 - `docs/EXCHANGES.md`: exchange capability matrix (Supported vs Experimental)
 - `docs/MARKETDATA.md`: market data routing, freshness scoring, plugins, and guardrails
