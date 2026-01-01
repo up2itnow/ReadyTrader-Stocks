@@ -3,8 +3,8 @@ from .core import (
     fetch_financial_news,
     fetch_rss_news,
     get_cached_sentiment_score,
-    get_market_sentiment,
     get_market_news,
+    get_market_sentiment,
 )
 from .insights import InsightStore, MarketInsight
 from .technical_analysis import (

@@ -1,10 +1,11 @@
 import json
-import pytest
-from unittest.mock import MagicMock, patch
-from core.risk import RiskGuardian
-from app.tools.execution import place_stock_order
+from unittest.mock import patch
+
 from app.core.config import settings
 from app.core.container import global_container
+from app.tools.execution import place_stock_order
+from core.risk import RiskGuardian
+
 
 def test_price_collar_violation():
     rg = RiskGuardian()

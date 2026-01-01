@@ -1,5 +1,7 @@
 import os
+
 from observability.audit import AuditLog
+
 
 def test_audit_hashing_integrity():
     db_path = "data/test_audit.db"

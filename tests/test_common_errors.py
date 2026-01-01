@@ -1,5 +1,5 @@
-import pytest
-from common.errors import AppError, MarketClosedError, CircuitBreakerError, classify_exception
+from common.errors import AppError, CircuitBreakerError, MarketClosedError, classify_exception
+
 
 def test_app_error_basics():
     e = AppError("code", "msg", {"a": 1})

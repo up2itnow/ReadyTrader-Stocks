@@ -1,6 +1,7 @@
-import pytest
 import time
+
 from common.cache import TTLCache
+
 
 def test_ttl_cache_basics():
     cache = TTLCache(max_items=2)

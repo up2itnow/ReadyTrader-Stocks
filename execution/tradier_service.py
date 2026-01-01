@@ -1,8 +1,12 @@
 from __future__ import annotations
+
 import os
-import requests
 from typing import Any, Dict, List, Optional
+
+import requests
+
 from execution.base import IBrokerage
+
 
 class TradierBrokerage(IBrokerage):
     """

@@ -6,9 +6,10 @@ import sys
 # Ensure app is in path
 sys.path.append(os.getcwd())
 
-from app.core.container import global_container
 from execution.stock_executor import StockExecutor
+
 from strategy.moving_average import SmaStrategy
+
 
 async def verify():
     print("--- Verifying Live Trading & Strategy ---")

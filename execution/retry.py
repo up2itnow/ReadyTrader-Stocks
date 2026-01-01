@@ -72,7 +72,7 @@ def with_retry(op: str, fn: Callable[[], T]) -> T:
                 ) from e
             # exponential backoff with jitter
             delay = min(max_delay, base * (2 ** (attempt - 1)))
-            jitter = 0.5 + (random.random() * 0.5)
+            jitter = 0.5 + (random.random() * 0.5) # nosec
             time.sleep(delay * jitter)
 
     # should never reach

@@ -1,15 +1,15 @@
 from __future__ import annotations
-import logging
 
 import os
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
-import yfinance as yf
 import pandas as pd
+import yfinance as yf
 
 from common.cache import TTLCache
 from common.errors import AppError
+
 
 def _parse_timeframe_seconds(timeframe: str) -> Optional[int]:
     tf = timeframe.strip().lower()
@@ -86,13 +86,18 @@ class ExchangeProvider:
         try:
             # yfinance interval mapping
             yf_interval = timeframe
-            if timeframe == "1h": yf_interval = "1h"
-            elif timeframe == "1d": yf_interval = "1d"
-            elif timeframe == "1m": yf_interval = "1m"
+            if timeframe == "1h":
+                yf_interval = "1h"
+            elif timeframe == "1d":
+                yf_interval = "1d"
+            elif timeframe == "1m":
+                yf_interval = "1m"
             
             period = "1mo"
-            if timeframe == '1m': period = "5d"
-            if timeframe == '1d': period = "1y"
+            if timeframe == '1m':
+                period = "5d"
+            if timeframe == '1d':
+                period = "1y"
 
             ticker = yf.Ticker(sym)
             df = ticker.history(period=period, interval=yf_interval)

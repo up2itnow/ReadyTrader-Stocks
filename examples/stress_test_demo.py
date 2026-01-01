@@ -45,8 +45,8 @@ def main() -> int:
     if str(root) not in sys.path:
         sys.path.insert(0, str(root))
 
-    from intelligence.recommendations import recommend_settings
     from core.stress_test import run_synthetic_stress_test
+    from intelligence.recommendations import recommend_settings
 
     out_dir = Path("artifacts") / "demo_stress"
     out_dir.mkdir(parents=True, exist_ok=True)

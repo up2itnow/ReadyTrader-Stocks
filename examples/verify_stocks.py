@@ -8,6 +8,7 @@ sys.path.append(os.getcwd())
 
 from app.core.container import global_container
 
+
 async def verify():
     print("--- Verifying ReadyTrader-Stocks ---")
     
@@ -38,7 +39,7 @@ async def verify():
         # Place Order (Limit)
         # Assuming current price is around ticker['last']
         # price variable already holds the last price from above
-        buy_price = price * 0.99 # slightly below to sit on book, or match immediately?
+        # buy_price = price * 0.99 # slightly below to sit on book, or match immediately?
         # Check logic: update_open_orders matches if price <= limit for buy?
         # Actually in paper_engine: if side == 'buy' and current_price <= price: fill.
         # So if we buy at 1.01 * price (limit higher than current), it should fill immediately.

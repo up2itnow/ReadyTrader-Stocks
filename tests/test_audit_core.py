@@ -1,9 +1,11 @@
-import pytest
-import sqlite3
 import os
-import json
-from unittest.mock import patch, MagicMock
+import sqlite3
+from unittest.mock import patch
+
+import pytest
+
 from observability.audit import AuditLog
+
 
 @pytest.fixture
 def audit_db(tmp_path):
@@ -54,7 +56,7 @@ def test_initial_migration(tmp_path):
     db_path = str(tmp_path / "old_audit.db")
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     conn = sqlite3.connect(db_path)
-    conn.execute("CREATE TABLE audit_events(id INTEGER PRIMARY KEY, ts_ms INT, request_id TEXT, tool TEXT, ok INT, error_code TEXT, mode TEXT, venue TEXT, exchange TEXT, market_type TEXT, summary_json TEXT)")
+    conn.execute("CREATE TABLE audit_events(id INTEGER PRIMARY KEY, ts_ms INT, request_id TEXT, tool TEXT, ok INT, error_code TEXT, mode TEXT, venue TEXT, exchange TEXT, market_type TEXT, summary_json TEXT)") # noqa: E501
     conn.commit()
     conn.close()
     

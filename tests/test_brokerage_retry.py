@@ -1,5 +1,7 @@
 import pytest
+
 from execution.retry import with_retry
+
 
 def test_with_retry_retries_transient_and_then_succeeds(monkeypatch):
     calls = {"n": 0}

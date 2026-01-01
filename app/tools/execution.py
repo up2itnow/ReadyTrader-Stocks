@@ -3,9 +3,9 @@ from typing import Any, Dict
 
 from fastmcp import FastMCP
 
+from app.core.compliance import global_compliance_ledger
 from app.core.config import settings
 from app.core.container import global_container
-from app.core.compliance import global_compliance_ledger
 
 
 def _json_ok(data: Dict[str, Any] | None = None) -> str:
@@ -26,7 +26,7 @@ def place_limit_order(symbol: str, side: str, amount: float, price: float, ratio
     """Place a limit order for a stock."""
     return place_stock_order(symbol, side, amount, price=price, order_type="limit", rationale=rationale)
 
-def place_stock_order(symbol: str, side: str, amount: float, price: float = 0.0, order_type: str = "market", exchange: str = "alpaca", rationale: str = "", audit_context: str = "") -> str:
+def place_stock_order(symbol: str, side: str, amount: float, price: float = 0.0, order_type: str = "market", exchange: str = "alpaca", rationale: str = "", audit_context: str = "") -> str: # noqa: E501
     """[RISK] Place an order for a stock through the Risk Guardian."""
     
     # 0. Compliance Audit Context

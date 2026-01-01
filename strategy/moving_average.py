@@ -1,11 +1,9 @@
 
 import logging
-import time
-from typing import Any, Dict, List, Optional
-import pandas as pd
-import pandas_ta as ta
+from typing import Any, Dict
 
-from marketdata.exchange_provider import ExchangeProvider
+import pandas as pd
+
 from app.core.container import global_container
 
 logger = logging.getLogger(__name__)

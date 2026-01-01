@@ -72,4 +72,4 @@ class Learner:
             conn.commit()
             conn.close()
         except Exception:
-            pass
+            pass # nosec

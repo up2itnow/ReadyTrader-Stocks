@@ -1,5 +1,7 @@
 import json
+
 import pytest
+
 from marketdata.bus import MarketDataBus
 
 

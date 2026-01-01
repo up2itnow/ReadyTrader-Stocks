@@ -1,10 +1,12 @@
 from __future__ import annotations
+
 import os
 from typing import Any, Dict, List, Optional
+
 from execution.base import IBrokerage
 
 try:
-    from ib_insync import IB, Stock, MarketOrder, LimitOrder
+    from ib_insync import IB, LimitOrder, MarketOrder, Stock
     _IB_AVAILABLE = True
 except ImportError:
     _IB_AVAILABLE = False

@@ -1,8 +1,9 @@
-import pytest
 import numpy as np
 import pandas as pd
+
 from intelligence.recommendations import recommend_settings
 from intelligence.regime import RegimeDetector
+
 
 def test_recommend_settings():
     # 1. High Drawdown -> Suggest max_alloc_pct reduction

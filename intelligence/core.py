@@ -1,5 +1,4 @@
 import os
-import random
 import time
 from typing import Any, Dict, Optional
 
@@ -185,7 +184,7 @@ def analyze_social_sentiment(symbol: str) -> str:
             if titles:
                 preview = " | ".join(titles[:2])
                 reddit_result = f"Reddit: Found {len(titles)} posts. Preview: {preview}"
-                rationales.append(f"Reddit active discussion in r/stocks")
+                rationales.append("Reddit active discussion in r/stocks")
                 score += 0.2
             else:
                 reddit_result = "Reddit: No recent posts found."

@@ -1,6 +1,6 @@
 import pandas as pd
 import ta
-import numpy as np
+
 
 def calculate_vwap(df: pd.DataFrame) -> pd.Series:
     """Calculate Volume Weighted Average Price."""

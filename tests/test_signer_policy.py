@@ -1,7 +1,10 @@
 import os
 from unittest.mock import MagicMock
+
 import pytest
+
 from signing.policy import PolicyEnforcedSigner, SignerPolicyViolation, policy_config_from_env
+
 
 @pytest.fixture
 def mock_inner(monkeypatch):

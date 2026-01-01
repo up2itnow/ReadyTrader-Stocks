@@ -1,5 +1,5 @@
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 # If FastMCP wraps them, we might need to access `.fn` or just call them if they act as proxies.
 # Assuming standard python decorators, they are callable.

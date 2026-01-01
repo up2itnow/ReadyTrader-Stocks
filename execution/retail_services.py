@@ -1,9 +1,11 @@
 from __future__ import annotations
-import os
-import json
+
 import logging
+import os
 from typing import Any, Dict, List, Optional
+
 import requests
+
 from execution.base import IBrokerage
 
 # Conditional imports for optional dependencies
@@ -144,7 +146,7 @@ class SchwabBrokerage(IBrokerage):
                     "market_value": float(p.get("marketValue", 0.0))
                 })
             return out
-        except Exception as e:
+        except Exception:
             return []
 
 

@@ -1,9 +1,11 @@
-import pytest
-import time
 import os
-import secrets
+import time
 from unittest.mock import patch
-from execution.store import ExecutionStore, ExecutionProposal
+
+import pytest
+
+from execution.store import ExecutionStore
+
 
 @pytest.fixture
 def store(tmp_path):
@@ -22,9 +24,12 @@ def test_create_get_pending(store):
     assert pending[0]["request_id"] == p.request_id
 
 def test_expiry(store):
-    p = store.create(kind="trade", payload={"foo": "bar"}, ttl_seconds=0.1)
+    store.create(kind="trade", payload={"foo": "bar"}, ttl_seconds=0.1)
     time.sleep(0.2)
     # create another valid one
+
+# ... (skipping to next fix in same file if possible, or separate calls)
+
     store.create(kind="trade", payload={"foo": "baz"}, ttl_seconds=60)
     
     pending = store.list_pending()["pending"]
@@ -62,7 +67,7 @@ def test_persistence(tmp_path):
         s1 = ExecutionStore()
         p = s1.create(kind="trade", payload={"a": 1})
         rid = p.request_id
-        session_id = s1._session_id
+        # session_id = s1._session_id
         
         # Determine if session_id check validates persistence within same session
         # Logic: `if row[8] != self._session_id: return None`

@@ -1,7 +1,8 @@
-import pytest
-import pandas as pd
 import numpy as np
-from intelligence.technical_analysis import calculate_indicators, calculate_vwap
+import pandas as pd
+
+from intelligence.technical_analysis import calculate_indicators
+
 
 def test_calculate_indicators():
     # Generate simple data

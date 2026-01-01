@@ -1,7 +1,7 @@
-import pytest
 from unittest.mock import MagicMock, patch
-import pandas as pd
+
 from strategy.moving_average import SmaStrategy
+
 
 def test_sma_strategy_golden_cross():
     # Mock global container

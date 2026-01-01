@@ -1,7 +1,10 @@
-import pytest
 from unittest.mock import MagicMock
-from marketdata.providers import StockMarketDataProvider, IngestMarketDataProvider, _to_timestamp_ms, _normalize_ticker_shape
+
+import pytest
+
+from marketdata.providers import IngestMarketDataProvider, StockMarketDataProvider, _normalize_ticker_shape, _to_timestamp_ms
 from marketdata.store import InMemoryMarketDataStore
+
 
 @pytest.mark.asyncio
 async def test_stock_provider_conformance():

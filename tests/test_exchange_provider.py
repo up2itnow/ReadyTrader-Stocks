@@ -1,6 +1,9 @@
-import pandas as pd
 from unittest.mock import MagicMock, patch
+
+import pandas as pd
+
 from marketdata.exchange_provider import ExchangeProvider
+
 
 def test_ticker_cache_hits():
     # Mocking yfinance since we don't pass exchanges anymore

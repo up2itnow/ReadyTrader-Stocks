@@ -1,24 +1,35 @@
 from __future__ import annotations
+
 import os
 from typing import Any, Dict, List, Optional
-import alpaca_trade_api as tradeapi
+
 from execution.base import IBrokerage
+
+# Conditional import to allow safe loading if dependencies missing
+try:
+    from alpaca.trading.client import TradingClient
+    from alpaca.trading.enums import OrderSide, TimeInForce
+    from alpaca.trading.requests import LimitOrderRequest, MarketOrderRequest
+    _ALPACA_PY_AVAILABLE = True
+except ImportError:
+    _ALPACA_PY_AVAILABLE = False
 
 class AlpacaBrokerage(IBrokerage):
     """
-    Concrete implementation of a brokerage service using Alpaca Trade API.
+    Concrete implementation of a brokerage service using Alpaca-py SDK.
     Handles real order execution and account monitoring.
     """
     def __init__(self):
         self.api_key = os.getenv("ALPACA_API_KEY")
         self.api_secret = os.getenv("ALPACA_API_SECRET")
-        self.base_url = os.getenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")
+        self.paper_mode = os.getenv("PAPER_MODE", "true").lower() == "true"
         
-        if not self.api_key or not self.api_secret:
+        if not self.api_key or not self.api_secret or not _ALPACA_PY_AVAILABLE:
             self._available = False
+            self.client = None
         else:
             self._available = True
-            self.api = tradeapi.REST(self.api_key, self.api_secret, self.base_url, api_version='v2')
+            self.client = TradingClient(self.api_key, self.api_secret, paper=self.paper_mode)
 
     def is_available(self) -> bool:
         return self._available
@@ -27,26 +38,43 @@ class AlpacaBrokerage(IBrokerage):
         """
         Place a real order on Alpaca.
         """
-        if not self._available:
-            raise RuntimeError("Alpaca API keys not configured.")
+        if not self._available or not self.client:
+            raise RuntimeError("Alpaca API keys not configured or library missing.")
 
         try:
-            order = self.api.submit_order(
-                symbol=symbol,
-                qty=qty,
-                side=side,
-                type=order_type,
-                time_in_force='gtc',
-                limit_price=str(price) if price and order_type == 'limit' else None
-            )
+            req = None
+            oside = OrderSide.BUY if side.lower() == 'buy' else OrderSide.SELL
+            
+            if order_type.lower() == "market":
+                req = MarketOrderRequest(
+                    symbol=symbol,
+                    qty=qty,
+                    side=oside,
+                    time_in_force=TimeInForce.GTC
+                )
+            elif order_type.lower() == "limit":
+                if not price:
+                    raise ValueError("Price required for limit order")
+                req = LimitOrderRequest(
+                    symbol=symbol,
+                    qty=qty,
+                    side=oside,
+                    time_in_force=TimeInForce.GTC,
+                    limit_price=price
+                )
+            else:
+                 raise ValueError(f"Unsupported order type: {order_type}")
+
+            order = self.client.submit_order(order_data=req)
+            
             return {
-                "id": order.id,
-                "client_order_id": order.client_order_id,
-                "status": order.status,
+                "id": str(order.id),
+                "client_order_id": str(order.client_order_id),
+                "status": str(order.status),
                 "symbol": order.symbol,
-                "qty": float(order.qty),
-                "side": order.side,
-                "type": order.type
+                "qty": float(order.qty) if order.qty else 0.0,
+                "side": str(order.side),
+                "type": str(order.type)
             }
         except Exception as e:
             raise RuntimeError(f"Alpaca order failure: {str(e)}")
@@ -55,15 +83,15 @@ class AlpacaBrokerage(IBrokerage):
         """
         Fetch account equity and cash.
         """
-        if not self._available:
+        if not self._available or not self.client:
             raise RuntimeError("Alpaca API keys not configured.")
         
         try:
-            account = self.api.get_account()
+            account = self.client.get_account()
             return {
-                "equity": float(account.equity),
-                "cash": float(account.cash),
-                "buying_power": float(account.buying_power)
+                "equity": float(account.equity or 0.0),
+                "cash": float(account.cash or 0.0),
+                "buying_power": float(account.buying_power or 0.0)
             }
         except Exception as e:
             raise RuntimeError(f"Alpaca account fetch failure: {str(e)}")
@@ -72,18 +100,18 @@ class AlpacaBrokerage(IBrokerage):
         """
         List all open positions.
         """
-        if not self._available:
+        if not self._available or not self.client:
             raise RuntimeError("Alpaca API keys not configured.")
             
         try:
-            positions = self.api.list_positions()
+            positions = self.client.get_all_positions()
             return [
                 {
                     "symbol": p.symbol,
                     "qty": float(p.qty),
-                    "market_value": float(p.market_value),
-                    "avg_entry_price": float(p.avg_entry_price),
-                    "unrealized_pl": float(p.unrealized_pl)
+                    "market_value": float(p.market_value or 0.0),
+                    "avg_entry_price": float(p.avg_entry_price or 0.0),
+                    "unrealized_pl": float(p.unrealized_pl or 0.0)
                 }
                 for p in positions
             ]

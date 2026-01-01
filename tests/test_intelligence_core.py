@@ -1,14 +1,15 @@
-import pytest
 from unittest.mock import MagicMock, patch
+
 from intelligence.core import (
-    get_market_sentiment, 
-    analyze_social_sentiment, 
-    SentimentCache, 
+    SentimentCache,
+    analyze_social_sentiment,
+    fetch_financial_news,
+    fetch_rss_news,
     get_cached_sentiment_score,
     get_market_news,
-    fetch_rss_news,
-    fetch_financial_news
+    get_market_sentiment,
 )
+
 
 def test_get_market_sentiment_success():
     with patch("requests.get") as mock_get:

@@ -4,7 +4,6 @@ from app.tools.execution import register_execution_tools
 from app.tools.market_data import register_market_tools
 from app.tools.research import register_research_tools
 from app.tools.trading import register_trading_tools
-from intelligence.core import register_intelligence_tools
 
 # Initialize FastMCP server
 mcp = FastMCP("ReadyTrader-Stocks")

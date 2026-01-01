@@ -1,8 +1,8 @@
 import asyncio
-import json
-import os
-from intelligence.core import get_market_sentiment
+
 from app.core.container import global_container
+from intelligence.core import get_market_sentiment
+
 
 async def verify_improvements():
     print("--- Verifying Sentiment ---")
@@ -13,7 +13,6 @@ async def verify_improvements():
     print("\n--- Verifying Async Market Data ---")
     # Fetch price for AAPL using async bus
     try:
-        from marketdata.bus import MarketDataResult
         res = await global_container.marketdata_bus.fetch_ticker("AAPL")
         print(f"Price for AAPL: {res.data.get('last')} (Source: {res.source})")
         assert res.data.get('last') > 0
