@@ -58,5 +58,18 @@ class Learner:
             return f"Error analyzing performance: {str(e)}"
             
     def save_lesson(self, lesson: str):
-        # Could save high-level takeaways to a separate table
-        pass
+        """
+        Save a learned lesson to the database.
+        """
+        try:
+            conn = sqlite3.connect(self.db_path)
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS lessons (id INTEGER PRIMARY KEY, lesson TEXT, created_at REAL)"
+            )
+            conn.execute(
+                "INSERT INTO lessons (lesson, created_at) VALUES (?, ?)", (lesson, pd.Timestamp.now().timestamp())
+            )
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
