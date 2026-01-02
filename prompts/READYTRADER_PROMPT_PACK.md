@@ -1,4 +1,4 @@
-## ReadyTrader-Crypto Prompt Pack (Phase 6)
+## ReadyTrader-Stocks Prompt Pack
 
 These are copy/paste prompts you can drop into Agent Zero, Claude, or any MCP-capable agent.
 
@@ -6,7 +6,7 @@ These are copy/paste prompts you can drop into Agent Zero, Claude, or any MCP-ca
 
 ## Prompt 1 — 10-minute paper-mode evaluation
 
-You have access to the ReadyTrader-Crypto MCP server. We are in PAPER_MODE=true.
+You have access to the ReadyTrader-Stocks MCP server. We are in PAPER_MODE=true.
 
 Goals:
 - Validate you can use the tools safely
@@ -14,10 +14,10 @@ Goals:
 
 Steps:
 1) Call `get_health()` and summarize anything non-OK.
-2) Call `deposit_paper_funds("USDC", 10000)` for user `agent_zero`.
-3) Place a paper limit order: `place_limit_order("buy", "ETH/USDT", 1.0, 2000.0)`.
-4) Call `check_orders("ETH/USDT")` until the order is filled (or explain why it won’t fill).
-5) Call `get_address_balance("0x0000000000000000000000000000000000000000", "paper")` if available, and/or report balances using paper tools.
+2) Call `deposit_paper_funds("USD", 10000)` for user `agent_zero`.
+3) Place a paper limit order: `place_limit_order("buy", "AAPL", 10.0, 150.0)`.
+4) Call `check_orders("AAPL")` until the order is filled (or explain why it won’t fill).
+5) Call `get_address_balance` or report balances using paper tools.
 6) Produce a final summary with:
    - final balances
    - portfolio value (if available)
@@ -60,13 +60,12 @@ Output requirements:
 
 ## Prompt 3 — Live trading preflight (DO NOT EXECUTE TRADES)
 
-We are preparing for live mode, but you must not place any live orders or sign transactions.
+We are preparing for live mode, but you must not place any live orders.
 
 Tasks:
 1) Call `get_health()` and check:
    - trading halted state
    - policy allowlists/limits
-   - signer configuration safety (address allowlist, signer policy)
+   - brokerage configuration safety (API key presence)
 2) Call `get_advanced_risk_disclosure()` but do not accept it.
 3) Output a “go/no-go” checklist and what env vars the operator should set before enabling live trading.
-

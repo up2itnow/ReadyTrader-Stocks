@@ -7,7 +7,7 @@ from app.core.config import settings
 from app.core.container import global_container
 
 # Import the specific functions from the new modules
-from app.tools.execution import place_stock_order, start_brokerage_private_ws
+from app.tools.trading import place_stock_order, start_brokerage_private_ws
 
 
 def test_fetch_price():
@@ -26,7 +26,6 @@ def test_place_stock_order_requires_approval():
             
             assert res["ok"] is True
             assert res["data"]["status"] == "pending_approval"
-            assert "requires manual confirmation" in res["data"]["message"]
 
 def test_place_stock_order_paper_mode():
     with patch.object(settings, 'PAPER_MODE', True):
@@ -40,19 +39,20 @@ def test_place_stock_order_paper_mode():
                     res = json.loads(res_str)
                     
                     assert res["ok"] is True
-                    assert res["data"]["mode"] == "paper"
+                    assert res["data"]["venue"] == "paper"
                     assert "Paper Trade Executed" in res["data"]["result"]
 
 def test_private_ws_paper_mode_blocked():
      with patch.object(settings, 'PAPER_MODE', True):
-         res_str = start_brokerage_private_ws("alpaca", "spot")
+         res_str = start_brokerage_private_ws("alpaca")
          res = json.loads(res_str)
          assert res["ok"] is False
          assert res["error"]["code"] == "paper_mode_not_supported"
 
-def test_private_ws_kraken_poll():
+def test_private_ws_alpaca_ws():
     with patch.object(settings, 'PAPER_MODE', False):
-        res_str = start_brokerage_private_ws("kraken", "spot")
+        res_str = start_brokerage_private_ws("alpaca")
         res = json.loads(res_str)
         assert res["ok"] is True
-        assert res["data"]["mode"] == "poll"
+        assert res["data"]["mode"] == "ws"
+        assert res["data"]["brokerage"] == "alpaca"

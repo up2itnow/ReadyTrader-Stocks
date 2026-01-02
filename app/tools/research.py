@@ -1,73 +1,65 @@
 import json
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from fastmcp import FastMCP
-
 from app.core.container import global_container
-from intelligence import analyze_social_sentiment, fetch_financial_news, fetch_rss_news
+from core.stress_test import run_synthetic_stress_test as _run_stress
 
 
 def _json_ok(data: Dict[str, Any] | None = None) -> str:
     payload = {"ok": True, "data": data or {}}
     return json.dumps(payload, indent=2, sort_keys=True)
 
+
 def _json_err(code: str, message: str, data: Dict[str, Any] | None = None) -> str:
     payload = {"ok": False, "error": {"code": code, "message": message, "data": data or {}}}
     return json.dumps(payload, indent=2, sort_keys=True)
 
-def _rate_limit(tool_name: str) -> Optional[str]:
-    # Shim to use the global rate limiter
+
+def post_market_insight(symbol: str, agent_id: str, signal: str, confidence: float, reasoning: str, ttl_seconds: int = 3600) -> str:
+    """Share a market insight or trade signal with other agents in the system."""
+    insight = global_container.insight_store.post_insight(symbol, agent_id, signal, confidence, reasoning, ttl_seconds)
+    return _json_ok({"insight": vars(insight)})
+
+
+def get_latest_insights(symbol: str = "") -> str:
+    """Retrieve recent high-confidence market insights for a specific symbol or all symbols."""
+    insights = global_container.insight_store.get_latest_insights(symbol if symbol else None)
+    return _json_ok({"insights": [vars(i) for i in insights]})
+
+
+def run_backtest_simulation(strategy_code: str, symbol: str, timeframe: str = '1h') -> str:
+    """Run a backtest of Python strategy code against historical historical data."""
+    result = global_container.backtest_engine.run(strategy_code, symbol, timeframe)
+    return _json_ok({"result": result})
+
+
+def get_market_regime(symbol: str, timeframe: str = '1d') -> str:
+    """Detect the prevailing market regime (TRENDING, RANGING, VOLATILE) for a stock."""
     try:
-        global_container.rate_limiter.check(key=f"tool:{tool_name}", limit=120, window_seconds=60)
-        return None
+        df = global_container.backtest_engine.fetch_ohlcv(symbol, timeframe, limit=100)
+        result = global_container.regime_detector.detect(df)
+        return _json_ok({"symbol": symbol, "timeframe": timeframe, "result": result})
     except Exception as e:
-         return _json_err("rate_limited", str(e))
+        return _json_err("market_regime_error", str(e), {"symbol": symbol, "timeframe": timeframe})
+
+
+def run_synthetic_stress_test(strategy_code: str, config_json: str = "{}") -> str:
+    """
+    Run a synthetic black-swan stress test on a strategy.
+    Deterministic simulator that injects various market regimes and crashes.
+    """
+    try:
+        config = json.loads(config_json)
+        result = _run_stress(strategy_code, config)
+        return _json_ok({"result": result})
+    except Exception as e:
+        return _json_err("stress_test_error", str(e))
+
 
 def register_research_tools(mcp: FastMCP):
-    
-    @mcp.tool()
-    def get_social_sentiment(symbol: str) -> str:
-        """Get simulated social media sentiment (X/Reddit)."""
-        return _json_ok({"symbol": symbol, "social_sentiment": analyze_social_sentiment(symbol)})
-
-    @mcp.tool()
-    def get_financial_news(symbol: str) -> str:
-        """Get simulated high-tier financial news (Bloomberg/Reuters)."""
-        return _json_ok({"symbol": symbol, "financial_news": fetch_financial_news(symbol)})
-
-    @mcp.tool()
-    def get_free_news(symbol: str = "") -> str:
-        """Get free market news from RSS feeds."""
-        # Fix: ensure fetch_rss_news is imported
-        try:
-            return _json_ok({"symbol": symbol, "news": fetch_rss_news(symbol)})
-        except NameError:
-             return _json_err("import_error", "fetch_rss_news not available")
-
-    @mcp.tool()
-    def post_market_insight(symbol: str, agent_id: str, signal: str, confidence: float, reasoning: str, ttl_seconds: int = 3600) -> str:
-        """[PHASE 3] Share a market insight with other agents."""
-        insight = global_container.insight_store.post_insight(symbol, agent_id, signal, confidence, reasoning, ttl_seconds)
-        return _json_ok({"insight": vars(insight)})
-
-    @mcp.tool()
-    def get_latest_insights(symbol: str = "") -> str:
-        """[PHASE 3] Get the most recent high-signal insights."""
-        insights = global_container.insight_store.get_latest_insights(symbol if symbol else None)
-        return _json_ok({"insights": [vars(i) for i in insights]})
-
-    @mcp.tool()
-    def run_backtest_simulation(strategy_code: str, symbol: str, timeframe: str = '1h') -> str:
-        """Run a strategy simulation against historical data."""
-        result = global_container.backtest_engine.run(strategy_code, symbol, timeframe)
-        return _json_ok({"result": result})
-
-    @mcp.tool()
-    def get_market_regime(symbol: str, timeframe: str = '1d') -> str:
-        """Detect the current market regime (TRENDING, RANGING, VOLATILE)."""
-        try:
-            df = global_container.backtest_engine.fetch_ohlcv(symbol, timeframe, limit=100)
-            result = global_container.regime_detector.detect(df)
-            return _json_ok({"symbol": symbol, "timeframe": timeframe, "result": result})
-        except Exception as e:
-            return _json_err("market_regime_error", str(e), {"symbol": symbol, "timeframe": timeframe})
+    mcp.add_tool(post_market_insight)
+    mcp.add_tool(get_latest_insights)
+    mcp.add_tool(run_backtest_simulation)
+    mcp.add_tool(get_market_regime)
+    mcp.add_tool(run_synthetic_stress_test)

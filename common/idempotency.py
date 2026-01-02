@@ -15,7 +15,7 @@ class IdempotencyStore:
     Why this exists:
     - Agents often retry tool calls (network hiccups, tool timeouts, etc.).
     - For order placement / execution tools, retries can cause duplicate actions.
-    - Idempotency keys let ReadyTrader-Crypto return the prior result instead of re-executing.
+    - Idempotency keys let ReadyTrader-Stocks return the prior result instead of re-executing.
 
     Persistence is explicitly optional and OFF by default:
     - If `IDEMPOTENCY_DB_PATH` (or `READYTRADER_IDEMPOTENCY_DB_PATH`) is set, results are stored in SQLite.

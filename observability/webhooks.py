@@ -60,7 +60,7 @@ class WebhookManager:
                 {"name": "Amount", "value": str(amount), "inline": True},
                 {"name": "Request ID", "value": request_id, "inline": False}
             ],
-            "footer": {"text": "ReadyTrader-Crypto Guardian Mode"}
+            "footer": {"text": "ReadyTrader-Stocks Guardian Mode"}
         }
         
         cls.send_discord_notification(msg, embed=embed)

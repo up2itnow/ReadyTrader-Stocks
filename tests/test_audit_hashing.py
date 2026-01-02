@@ -18,7 +18,7 @@ def test_audit_hashing_integrity():
     
     # 2. Use the built-in integrity check
     is_ok = audit.verify_integrity()
-    assert is_ok, "Audit log cryptographic integrity check failed!"
+    assert is_ok, "Audit log integrity check failed!"
     
     print("Audit Hashing Integrity Verified via verify_integrity()!")
 

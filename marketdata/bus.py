@@ -121,7 +121,7 @@ def _extract_ts_ms(t: Dict[str, Any]) -> Optional[int]:
 
 class MarketDataBus:
     """
-    Market data router with freshness scoring + source priority (Phase 3).
+    Market data router with freshness scoring + source priority.
 
     Provider order matters. A typical ordering is:
     1) Public websocket store ("exchange_ws") (opt-in)

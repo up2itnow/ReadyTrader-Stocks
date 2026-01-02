@@ -136,7 +136,7 @@ class AuditLog:
                 """
                 SELECT ts_ms, tool, summary_json 
                 FROM audit_events 
-                WHERE ok=1 AND tool IN ('swap_tokens', 'place_cex_order', 'transfer_eth')
+                WHERE ok=1 AND tool IN ('place_market_order', 'place_limit_order', 'place_stock_order', 'place_cex_order', 'swap_tokens')
                 ORDER BY ts_ms ASC
                 """
             )
@@ -162,17 +162,16 @@ class AuditLog:
             side = "N/A"
             tx_id = "N/A"
             
-            if tool == "swap_tokens":
-                symbol = f"{data.get('from_token')} -> {data.get('to_token')}"
-                amount = data.get("amount")
-                side = "SWAP"
-                # Parse tx hash from result string if possible, or use request_id
-                tx_id = "see_logs" 
-            elif tool == "place_cex_order":
+            if tool in ("place_market_order", "place_limit_order", "place_stock_order", "place_cex_order"):
                 symbol = data.get("symbol")
                 amount = data.get("amount")
                 side = data.get("side", "").upper()
-                tx_id = data.get("order_id") or "see_logs"
+                tx_id = data.get("order_id") or data.get("request_id") or "see_logs"
+            elif tool == "swap_tokens":
+                symbol = f"{data.get('from_token')} -> {data.get('to_token')}"
+                amount = data.get("amount")
+                side = "SWAP"
+                tx_id = "see_logs" 
             elif tool == "transfer_eth":
                 symbol = data.get("chain", "ETH")
                 amount = data.get("amount")

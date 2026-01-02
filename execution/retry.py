@@ -1,5 +1,5 @@
 """
-Execution retry helpers (Phase 2D).
+Execution retry helpers.
 
 We keep this intentionally small:
 - retry only transient brokerage/network-style errors

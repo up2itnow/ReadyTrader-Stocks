@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 from app.core.config import settings
 from app.core.container import global_container
-from app.tools.execution import place_stock_order
+from app.tools.trading import place_stock_order
 from core.risk import RiskGuardian
 
 

@@ -20,7 +20,7 @@ class StrategyArtifact:
 
 class StrategyRegistry:
     """
-    Local marketplace for saving and sharing agent strategies (Phase 3).
+    Local marketplace for saving and sharing agent strategies.
     """
     def __init__(self, db_path: Optional[str] = None):
         self.db_path = db_path or os.getenv("REALTRADER_STRATEGY_DB_PATH", os.getenv("STRATEGY_DB_PATH", "data/strategies.db"))

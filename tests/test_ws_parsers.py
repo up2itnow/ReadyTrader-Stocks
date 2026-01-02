@@ -1,48 +1,41 @@
+import pytest
+
 from marketdata.ws_streams import (
-    parse_binance_ticker_message,
-    parse_coinbase_ticker_message,
-    parse_kraken_ticker_message,
+    parse_alpaca_ticker_message,
 )
 
 
-def test_parse_binance_ticker_message():
-    msg = {
-        "stream": "btcusdt@ticker",
-        "data": {"c": "100.0", "b": "99.5", "a": "100.5", "E": 123, "s": "BTCUSDT"},
-    }
-    snap = parse_binance_ticker_message(msg, stream_to_symbol={"BTCUSDT": "BTC/USDT"})
-    assert snap is not None
-    assert snap["symbol"] == "BTC/USDT"
-    assert snap["last"] == 100.0
-    assert snap["bid"] == 99.5
-    assert snap["ask"] == 100.5
-    assert snap["timestamp_ms"] == 123
-
-
-def test_parse_coinbase_ticker_message():
-    msg = {
-        "type": "ticker",
-        "product_id": "BTC-USD",
-        "price": "50000.0",
-        "best_bid": "49999.0",
-        "best_ask": "50001.0",
-        "time": "2020-01-01T00:00:00Z",
-    }
-    snap = parse_coinbase_ticker_message(msg)
-    assert snap is not None
-    assert snap["symbol"] == "BTC/USD"
-    assert snap["last"] == 50000.0
-
-
-def test_parse_kraken_ticker_message():
+def test_parse_alpaca_ticker_message_quote():
     msg = [
-        1,
-        {"a": ["10.1", "1", "1.0"], "b": ["9.9", "1", "1.0"], "c": ["10.0", "1.0"]},
-        "ticker",
-        "XBT/USDT",
+        {"T": "q", "S": "AAPL", "bp": 150.1, "ap": 150.2, "t": "2021-04-01T12:00:00Z"}
     ]
-    snap = parse_kraken_ticker_message(msg)
-    assert snap is not None
-    assert snap["symbol"] == "BTC/USDT"
-    assert snap["last"] == 10.0
+    snaps = parse_alpaca_ticker_message(msg)
+    assert len(snaps) == 1
+    snap = snaps[0]
+    assert snap["symbol"] == "AAPL"
+    assert snap["bid"] == 150.1
+    assert snap["ask"] == 150.2
+    assert snap["last"] == pytest.approx(150.15)
 
+
+def test_parse_alpaca_ticker_message_trade():
+    msg = [
+        {"T": "t", "S": "MSFT", "p": 250.0, "s": 100, "t": "2021-04-01T12:00:00Z"}
+    ]
+    snaps = parse_alpaca_ticker_message(msg)
+    assert len(snaps) == 1
+    snap = snaps[0]
+    assert snap["symbol"] == "MSFT"
+    assert snap["last"] == 250.0
+    assert snap.get("bid") is None
+
+
+def test_parse_alpaca_ticker_multiple():
+    msg = [
+        {"T": "q", "S": "AAPL", "bp": 150.0, "ap": 151.0},
+        {"T": "t", "S": "TSLA", "p": 600.0}
+    ]
+    snaps = parse_alpaca_ticker_message(msg)
+    assert len(snaps) == 2
+    assert snaps[0]["symbol"] == "AAPL"
+    assert snaps[1]["symbol"] == "TSLA"

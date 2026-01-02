@@ -1,5 +1,5 @@
 """
-ReadyTrader-Crypto Phase 6 — Synthetic Stress Lab demo (offline, deterministic).
+ReadyTrader-Stocks — Synthetic Stress Lab demo (offline, deterministic).
 
 This script runs a randomized synthetic market stress test, then writes exportable artifacts:
 - JSON summary report

@@ -10,7 +10,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 os.environ["PRIVATE_KEY"] = "0000000000000000000000000000000000000000000000000000000000000001"
 os.environ["SIGNER_TYPE"] = "env_private_key"
 os.environ["PAPER_MODE"] = "true"
-os.environ["EXECUTION_MODE"] = "dex"
+os.environ["EXECUTION_MODE"] = "stock"
 
 @pytest.fixture(autouse=True)
 def mock_env_setup():

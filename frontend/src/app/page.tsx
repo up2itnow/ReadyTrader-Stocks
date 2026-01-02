@@ -2,9 +2,9 @@
 
 import { useMarketData } from '@/hooks/useMarketData';
 import { usePendingApprovals } from '@/hooks/usePendingApprovals';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { TrendingUp, AlertTriangle, ShieldCheck, Zap } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { AreaChart, Area, Tooltip, ResponsiveContainer } from 'recharts';
+import { ShieldCheck, Zap } from 'lucide-react';
+import { useEffect } from 'react';
 
 // Dummy data for the chart
 const dummyChartData = [
@@ -19,8 +19,7 @@ const dummyChartData = [
 
 export default function Dashboard() {
   const { tickers, connected } = useMarketData();
-  const { approvals, loading } = usePendingApprovals();
-  const [portfolio, setPortfolio] = useState<any>(null);
+  const { approvals } = usePendingApprovals();
 
   useEffect(() => {
     // Fetch initial portfolio

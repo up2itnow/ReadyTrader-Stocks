@@ -3,7 +3,7 @@ import time
 
 def test_ws_stream_restart_after_stop():
     """
-    Phase 1A regression test:
+    Regression test:
     Streams must be restartable after stop() (the stop flag must be cleared on start()).
     """
 

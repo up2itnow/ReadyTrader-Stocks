@@ -21,7 +21,7 @@ class MarketInsight:
 
 class InsightStore:
     """
-    Persistent store for Market Insights shared between agents (Phase 3).
+    Persistent store for Market Insights shared between agents.
     """
     def __init__(self, db_path: Optional[str] = None):
         self.db_path = db_path or os.getenv("READYTRADER_INSIGHT_DB_PATH", os.getenv("INSIGHT_DB_PATH", "data/insights.db"))

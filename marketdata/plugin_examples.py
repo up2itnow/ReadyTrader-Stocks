@@ -1,5 +1,5 @@
 """
-Example plugin providers for Phase 3C.
+Example plugin providers.
 
 These are intentionally simple and offline-friendly so operators can test the plugin system without
 adding new external dependencies.

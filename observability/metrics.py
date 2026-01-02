@@ -32,7 +32,7 @@ class Metrics:
     """
     Minimal in-memory metrics registry (Docker-first, no ports required).
 
-    Exposed via an MCP tool (Phase 4) as a snapshot JSON object.
+    Exposed via an MCP tool as a snapshot JSON object.
     """
 
     def __init__(self) -> None:

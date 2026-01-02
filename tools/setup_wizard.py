@@ -74,9 +74,8 @@ def check_keys():
     
     keys = {
         "PAPER_MODE": "true",
-        "EXECUTION_MODE": "dex",
-        "PRIVATE_KEY": None,
-        "CRYPTOPANIC_API_KEY": None,
+        "ALPACA_API_KEY": None,
+        "ALPACA_API_SECRET": None,
     }
     
     for key, default in keys.items():

@@ -1,27 +1,25 @@
 """
-Websocket-first market data streams (Phase 2.5).
+Websocket-first market data streams for stocks.
 
-This module provides **opt-in** background websocket clients for public ticker streams:
-- Binance (spot + swap/perp)
-- Coinbase (spot)
-- Kraken (spot)
+This module provides **opt-in** background websocket clients for stock ticker streams:
+- Alpaca (Primary stock data source)
 
 Design notes:
-- Streams run in a dedicated background thread per exchange+market_type key and use an asyncio loop
+- Streams run in a dedicated background thread per provider and use an asyncio loop
   within that thread (`asyncio.run`).
 - The network loops are intentionally excluded from unit tests. Instead, parser functions are unit-tested.
 - Parsed ticker snapshots are written into `InMemoryMarketDataStore` with short TTLs, so the MarketDataBus
-  can prefer websocket data when it is fresh, and fall back to CCXT REST when it is not.
+  can prefer websocket data when it is fresh, and fall back to REST (yfinance/alpaca) when it is not.
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
+import os
 import random
 import threading
 import time
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import websockets
@@ -41,124 +39,47 @@ class _MetricsLike:
         raise NotImplementedError
 
 
-def _split_symbol(symbol: str) -> tuple[str, str]:
+def _split_symbol(symbol: str) -> str:
     """
-    Split a symbol into (base, quote).
-
-    Supports:
-    - BTC/USDT
-    - BTC-USDT
-    - BTC/USDT:USDT (ccxt swap notation; we ignore the suffix)
+    Clean up a stock symbol.
+    ReadyTrader-Stocks uses standard ticker symbols (e.g., AAPL).
     """
-    s = (symbol or "").strip().upper()
-    if ":" in s:
-        s = s.split(":", 1)[0]
-    if "/" in s:
-        base, quote = s.split("/", 1)
-        return base, quote
-    if "-" in s:
-        base, quote = s.split("-", 1)
-        return base, quote
-    raise ValueError(f"Unsupported symbol format: {symbol}")
+    return (symbol or "").strip().upper()
 
 
-def _iso_to_ms(ts: str) -> Optional[int]:
-    try:
-        dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-        return int(dt.timestamp() * 1000)
-    except Exception:
-        return None
-
-
-def _binance_stream_symbol(symbol: str) -> str:
-    base, quote = _split_symbol(symbol)
-    return f"{base}{quote}".lower()
-
-
-def _coinbase_product_id(symbol: str) -> str:
-    base, quote = _split_symbol(symbol)
-    return f"{base}-{quote}"
-
-
-def _kraken_pair(symbol: str) -> str:
-    base, quote = _split_symbol(symbol)
-    if base == "BTC":
-        base = "XBT"
-    return f"{base}/{quote}"
-
-
-def parse_binance_ticker_message(msg: Dict[str, Any], *, stream_to_symbol: Dict[str, str]) -> Optional[Dict[str, Any]]:
+def parse_alpaca_ticker_message(msg: Any) -> List[Dict[str, Any]]:
     """
-    Parse a Binance combined-stream ticker message into a ticker snapshot dict.
-
-    Binance combined stream format:
-      {"stream":"btcusdt@ticker","data":{...}}
+    Parse Alpaca ticker messages (quotes or trades) into ticker snapshots.
+    Typical format: [{"T": "q", "S": "AAPL", "bp": 150.1, "as": 150.2, "t": "2021-04-01T12:00:00Z"}]
     """
-    data = msg.get("data") if isinstance(msg, dict) else None
-    if not isinstance(data, dict):
-        return None
-    stream = str(msg.get("stream") or "")
-    # stream is like: btcusdt@ticker
-    stream_sym = stream.split("@", 1)[0].upper()
-    symbol = stream_to_symbol.get(stream_sym)
-    if not symbol:
-        # fallback to data['s'] which is like BTCUSDT
-        symbol = stream_to_symbol.get(str(data.get("s") or "").upper())
-    if not symbol:
-        return None
-    try:
-        last = float(data.get("c"))
-        bid = float(data.get("b")) if data.get("b") is not None else None
-        ask = float(data.get("a")) if data.get("a") is not None else None
-        ts = int(data.get("E")) if data.get("E") is not None else None
-        return {"symbol": symbol, "last": last, "bid": bid, "ask": ask, "timestamp_ms": ts}
-    except Exception:
-        return None
+    if not isinstance(msg, list):
+        return []
 
+    results = []
+    for item in msg:
+        if not isinstance(item, dict):
+            continue
+        
+        entry_type = item.get("T")
+        symbol = item.get("S")
+        if not symbol:
+            continue
 
-def parse_coinbase_ticker_message(msg: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """
-    Parse a Coinbase (ws-feed) ticker message into a ticker snapshot dict.
-    """
-    if not isinstance(msg, dict):
-        return None
-    if msg.get("type") != "ticker":
-        return None
-    product_id = str(msg.get("product_id") or "")
-    if not product_id:
-        return None
-    symbol = product_id.replace("-", "/").upper()
-    try:
-        last = float(msg.get("price"))
-        bid = float(msg.get("best_bid")) if msg.get("best_bid") is not None else None
-        ask = float(msg.get("best_ask")) if msg.get("best_ask") is not None else None
-        ts = _iso_to_ms(str(msg.get("time") or ""))
-        return {"symbol": symbol, "last": last, "bid": bid, "ask": ask, "timestamp_ms": ts}
-    except Exception:
-        return None
-
-
-def parse_kraken_ticker_message(msg: Any) -> Optional[Dict[str, Any]]:
-    """
-    Parse a Kraken websocket ticker message into a ticker snapshot dict.
-    """
-    if not isinstance(msg, list) or len(msg) < 4:
-        return None
-    if msg[2] != "ticker":
-        return None
-    data = msg[1]
-    pair = str(msg[3] or "")
-    if not isinstance(data, dict) or not pair:
-        return None
-    # Convert XBT back to BTC for user-facing symbol
-    symbol = pair.replace("XBT", "BTC").upper()
-    try:
-        last = float(data.get("c", [None])[0])
-        bid = float(data.get("b", [None])[0]) if data.get("b") else None
-        ask = float(data.get("a", [None])[0]) if data.get("a") else None
-        return {"symbol": symbol, "last": last, "bid": bid, "ask": ask, "timestamp_ms": None}
-    except Exception:
-        return None
+        if entry_type == "q":  # Quote
+            results.append({
+                "symbol": symbol,
+                "bid": float(item.get("bp", 0)),
+                "ask": float(item.get("ap", 0)),
+                "last": float((item.get("bp", 0) + item.get("ap", 0)) / 2),
+                "timestamp_ms": None  # Alpaca provides RFC3339, we can parse if needed
+            })
+        elif entry_type == "t":  # Trade
+            results.append({
+                "symbol": symbol,
+                "last": float(item.get("p", 0)),
+                "timestamp_ms": None
+            })
+    return results
 
 
 class _WsStream:
@@ -173,7 +94,6 @@ class _WsStream:
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
             return
-        # If the stream was previously stopped, allow restarting.
         self._stop.clear()
         self._last_error = None
         if self._metrics:
@@ -201,7 +121,10 @@ class _WsStream:
         }
 
     def _run(self) -> None:
-        asyncio.run(self._run_async())
+        try:
+            asyncio.run(self._run_async())
+        except Exception as e:
+            self._last_error = str(e)
 
     async def _run_async(self) -> None:  # pragma: no cover (network loop)
         raise NotImplementedError
@@ -212,166 +135,88 @@ class _WsStream:
             self._metrics.inc(f"{self._metric_prefix}_messages_total", 1)
 
     async def _sleep_backoff(self, backoff: float) -> None:
-        """
-        Sleep with a little jitter to avoid synchronized reconnect storms.
-        """
         b = max(0.1, float(backoff))
-        jitter = 0.5 + (random.random() * 0.5)  # nosec B311 (non-crypto jitter)  # 0.5x .. 1.0x
+        jitter = 0.5 + (random.random() * 0.5)
         await asyncio.sleep(b * jitter)
 
 
-class BinanceTickerStream(_WsStream):
+class AlpacaTickerStream(_WsStream):
     def __init__(
         self,
         *,
         symbols: List[str],
-        market_type: str,
         store: InMemoryMarketDataStore,
         metrics: _MetricsLike | None = None,
     ) -> None:
-        super().__init__(metrics=metrics, metric_prefix=f"ws_binance_{market_type}")
-        self.exchange = "binance"
-        self.market_type = market_type
+        super().__init__(metrics=metrics, metric_prefix="ws_alpaca")
+        self.api_key = os.getenv("ALPACA_API_KEY")
+        self.api_secret = os.getenv("ALPACA_API_SECRET")
+        self.paper_mode = os.getenv("PAPER_MODE", "true").lower() == "true"
         self.symbols = [s.strip().upper() for s in symbols if s.strip()]
         self.store = store
-        # map BTCUSDT -> BTC/USDT
-        self.stream_to_symbol: Dict[str, str] = { _binance_stream_symbol(s).upper(): s for s in self.symbols }
 
     def _url(self) -> str:
-        base = "wss://stream.binance.com:9443/stream"
-        if self.market_type in {"swap", "perp"}:
-            base = "wss://fstream.binance.com/stream"
-        streams = "/".join([f"{_binance_stream_symbol(s)}@ticker" for s in self.symbols])
-        return f"{base}?streams={streams}"
+        # IEX is the free feed
+        return "wss://stream.data.alpaca.markets/v2/iex"
 
-    async def _run_async(self) -> None:  # pragma: no cover
+    async def _run_async(self) -> None:
+        if not self.api_key or not self.api_secret:
+            self._last_error = "Alpaca API credentials missing"
+            return
+
         backoff = 1.0
         while not self._stop.is_set():
             try:
                 if self._metrics:
                     self._metrics.inc(f"{self._metric_prefix}_connect_total", 1)
+                
                 async with websockets.connect(self._url(), ping_interval=20, ping_timeout=20) as ws:
+                    # 1. Receive welcome
+                    await asyncio.wait_for(ws.recv(), timeout=10)
+                    
+                    # 2. Authenticate
+                    auth_msg = {
+                        "action": "auth",
+                        "key": self.api_key,
+                        "secret": self.api_secret
+                    }
+                    await ws.send(json.dumps(auth_msg))
+                    
+                    auth_resp = await asyncio.wait_for(ws.recv(), timeout=10)
+                    auth_data = json.loads(auth_resp)
+                    if auth_data[0].get("T") == "error":
+                        self._last_error = f"Auth failed: {auth_data[0].get('msg')}"
+                        await self._sleep_backoff(10)
+                        continue
+
+                    # 3. Subscribe
+                    sub_msg = {
+                        "action": "subscribe",
+                        "quotes": self.symbols,
+                        "trades": self.symbols
+                    }
+                    await ws.send(json.dumps(sub_msg))
+                    
                     backoff = 1.0
                     while not self._stop.is_set():
                         raw = await asyncio.wait_for(ws.recv(), timeout=30)
                         msg = json.loads(raw)
-                        snap = parse_binance_ticker_message(msg, stream_to_symbol=self.stream_to_symbol)
-                        if not snap:
-                            if self._metrics:
-                                self._metrics.inc(f"{self._metric_prefix}_parse_fail_total", 1)
+                        snaps = parse_alpaca_ticker_message(msg)
+                        
+                        if not snaps:
                             continue
+                            
                         self._mark_message()
-                        self.store.put_ticker(
-                            symbol=snap["symbol"],
-                            last=snap["last"],
-                            bid=snap.get("bid"),
-                            ask=snap.get("ask"),
-                            timestamp_ms=snap.get("timestamp_ms"),
-                            source=f"binance_ws_{self.market_type}",
-                            ttl_sec=15.0,
-                        )
-            except Exception as e:
-                self._last_error = str(e)
-                if self._metrics:
-                    self._metrics.inc(f"{self._metric_prefix}_error_total", 1)
-                await self._sleep_backoff(backoff)
-                backoff = min(30.0, backoff * 2)
-
-
-class CoinbaseTickerStream(_WsStream):
-    def __init__(
-        self,
-        *,
-        symbols: List[str],
-        store: InMemoryMarketDataStore,
-        metrics: _MetricsLike | None = None,
-    ) -> None:
-        super().__init__(metrics=metrics, metric_prefix="ws_coinbase_spot")
-        self.exchange = "coinbase"
-        self.symbols = [s.strip().upper() for s in symbols if s.strip()]
-        self.store = store
-        self.product_ids = [_coinbase_product_id(s) for s in self.symbols]
-
-    async def _run_async(self) -> None:  # pragma: no cover
-        url = "wss://ws-feed.exchange.coinbase.com"
-        sub = {"type": "subscribe", "product_ids": self.product_ids, "channels": ["ticker"]}
-        backoff = 1.0
-        while not self._stop.is_set():
-            try:
-                if self._metrics:
-                    self._metrics.inc(f"{self._metric_prefix}_connect_total", 1)
-                async with websockets.connect(url, ping_interval=20, ping_timeout=20) as ws:
-                    backoff = 1.0
-                    await ws.send(json.dumps(sub))
-                    while not self._stop.is_set():
-                        raw = await asyncio.wait_for(ws.recv(), timeout=30)
-                        msg = json.loads(raw)
-                        snap = parse_coinbase_ticker_message(msg)
-                        if not snap:
-                            if self._metrics:
-                                self._metrics.inc(f"{self._metric_prefix}_parse_fail_total", 1)
-                            continue
-                        self._mark_message()
-                        self.store.put_ticker(
-                            symbol=snap["symbol"],
-                            last=snap["last"],
-                            bid=snap.get("bid"),
-                            ask=snap.get("ask"),
-                            timestamp_ms=snap.get("timestamp_ms"),
-                            source="coinbase_ws_spot",
-                            ttl_sec=15.0,
-                        )
-            except Exception as e:
-                self._last_error = str(e)
-                if self._metrics:
-                    self._metrics.inc(f"{self._metric_prefix}_error_total", 1)
-                await self._sleep_backoff(backoff)
-                backoff = min(30.0, backoff * 2)
-
-
-class KrakenTickerStream(_WsStream):
-    def __init__(
-        self,
-        *,
-        symbols: List[str],
-        store: InMemoryMarketDataStore,
-        metrics: _MetricsLike | None = None,
-    ) -> None:
-        super().__init__(metrics=metrics, metric_prefix="ws_kraken_spot")
-        self.exchange = "kraken"
-        self.symbols = [s.strip().upper() for s in symbols if s.strip()]
-        self.store = store
-        self.pairs = [_kraken_pair(s) for s in self.symbols]
-
-    async def _run_async(self) -> None:  # pragma: no cover
-        url = "wss://ws.kraken.com"
-        sub = {"event": "subscribe", "pair": self.pairs, "subscription": {"name": "ticker"}}
-        backoff = 1.0
-        while not self._stop.is_set():
-            try:
-                if self._metrics:
-                    self._metrics.inc(f"{self._metric_prefix}_connect_total", 1)
-                async with websockets.connect(url, ping_interval=20, ping_timeout=20) as ws:
-                    backoff = 1.0
-                    await ws.send(json.dumps(sub))
-                    while not self._stop.is_set():
-                        raw = await asyncio.wait_for(ws.recv(), timeout=30)
-                        msg = json.loads(raw)
-                        snap = parse_kraken_ticker_message(msg)
-                        if not snap:
-                            if self._metrics:
-                                self._metrics.inc(f"{self._metric_prefix}_parse_fail_total", 1)
-                            continue
-                        self._mark_message()
-                        self.store.put_ticker(
-                            symbol=snap["symbol"],
-                            last=snap["last"],
-                            bid=snap.get("bid"),
-                            ask=snap.get("ask"),
-                            timestamp_ms=snap.get("timestamp_ms"),
-                            source="kraken_ws_spot",
-                            ttl_sec=15.0,
-                        )
+                        for snap in snaps:
+                            self.store.put_ticker(
+                                symbol=snap["symbol"],
+                                last=snap["last"],
+                                bid=snap.get("bid"),
+                                ask=snap.get("ask"),
+                                timestamp_ms=snap.get("timestamp_ms"),
+                                source="alpaca_ws",
+                                ttl_sec=15.0,
+                            )
             except Exception as e:
                 self._last_error = str(e)
                 if self._metrics:
@@ -382,9 +227,7 @@ class KrakenTickerStream(_WsStream):
 
 class WsStreamManager:
     """
-    Manages background websocket ticker streams for top exchanges.
-
-    Streams are opt-in: nothing starts automatically in order to keep CI/tests deterministic.
+    Manages background websocket ticker streams for stock brokerages.
     """
 
     def __init__(self, *, store: InMemoryMarketDataStore, metrics: _MetricsLike | None = None) -> None:
@@ -393,24 +236,21 @@ class WsStreamManager:
         self._lock = threading.Lock()
         self._streams: Dict[str, _WsStream] = {}
 
-    def start(self, *, exchange: str, symbols: List[str], market_type: str = "spot") -> None:
+    def start(self, *, exchange: str, symbols: List[str], market_type: str = "stock") -> None:
         ex = (exchange or "").strip().lower()
         key = f"{ex}:{market_type}"
-        # Replace any existing stream for this (exchange, market_type) key to avoid duplicates.
         self.stop(exchange=ex, market_type=market_type)
-        if ex == "binance":
-            s = BinanceTickerStream(symbols=symbols, market_type=market_type, store=self._store, metrics=self._metrics)
-        elif ex == "coinbase":
-            s = CoinbaseTickerStream(symbols=symbols, store=self._store, metrics=self._metrics)
-        elif ex == "kraken":
-            s = KrakenTickerStream(symbols=symbols, store=self._store, metrics=self._metrics)
+        
+        if ex == "alpaca":
+            s = AlpacaTickerStream(symbols=symbols, store=self._store, metrics=self._metrics)
         else:
-            raise ValueError("Unsupported exchange for websocket streams. Use one of: binance, coinbase, kraken")
+            raise ValueError("Unsupported provider for websocket streams. Use 'alpaca'.")
+            
         with self._lock:
             self._streams[key] = s
         s.start()
 
-    def stop(self, *, exchange: str, market_type: str = "spot") -> None:
+    def stop(self, *, exchange: str, market_type: str = "stock") -> None:
         key = f"{(exchange or '').strip().lower()}:{market_type}"
         with self._lock:
             s = self._streams.pop(key, None)
@@ -421,4 +261,3 @@ class WsStreamManager:
         with self._lock:
             items = list(self._streams.items())
         return {k: v.status() for k, v in items}
-

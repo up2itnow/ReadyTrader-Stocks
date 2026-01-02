@@ -11,7 +11,7 @@ env/
 data/
 paper.db
 
-# Demo / local artifacts (Phase 6)
+# Demo / local artifacts
 artifacts/
 
 # OS

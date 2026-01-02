@@ -39,7 +39,7 @@ _SENSITIVE_KEYWORDS = ("secret", "password", "token", "private", "mnemonic", "ap
 
 def redact(value: Any) -> Any:
     """
-    Best-effort redaction for logs. This is defensive: ReadyTrader-Crypto should avoid logging secrets entirely.
+    Best-effort redaction for logs. This is defensive: ReadyTrader-Stocks should avoid logging secrets entirely.
     """
     if isinstance(value, dict):
         out: Dict[str, Any] = {}

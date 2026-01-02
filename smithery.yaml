@@ -12,9 +12,15 @@ projectUrl: https://github.com/up2itnow/ReadyTrader-Stocks
 configSchema:
   type: object
   properties:
+    ALPACA_API_KEY:
+      type: string
+      description: Alpaca API Key for stock trading
+    ALPACA_API_SECRET:
+      type: string
+      description: Alpaca API Secret for stock trading
     PAPER_MODE:
       type: string
-      description: "Set to 'true' for zero-risk paper trading simulation (default)."
+      description: Set to true for virtual paper trading (default)
       default: "true"
     RISK_PROFILE:
       type: string
@@ -22,12 +28,7 @@ configSchema:
       default: "conservative"
     EXECUTION_APPROVAL_MODE:
       type: string
-      description: "Set to 'approve_each' to require human confirmation for every trade."
+      description: 'auto' or 'approve_each' to require human confirmation for every trade.
       default: "auto"
-    CEX_API_KEY:
-      type: string
-      description: "API Key for centralized exchange execution."
-    CEX_API_SECRET:
-      type: string
       description: "API Secret for centralized exchange execution."
   required: []

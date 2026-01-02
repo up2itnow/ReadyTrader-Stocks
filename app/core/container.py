@@ -77,7 +77,6 @@ class Container:
             "robinhood": self.robinhood_brokerage
         }
         
-        self.signer = None # get_signer()
         self.learner = Learner(db_path=self.paper_engine.db_path) if settings.PAPER_MODE and self.paper_engine else None
 
 global_container = Container()

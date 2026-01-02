@@ -31,14 +31,14 @@ def test_audit_logs_and_verifies(audit_db):
     assert not audit_db.verify_integrity()
 
 def test_export_tax_report(audit_db):
-    audit_db.append(ts_ms=1000, request_id="r1", tool="swap_tokens", ok=True, summary={"from_token": "USDC", "to_token": "ETH", "amount": 100})
-    audit_db.append(ts_ms=2000, request_id="r2", tool="place_cex_order", ok=True, summary={"symbol": "AAPL", "side": "buy", "amount": 10})
-    audit_db.append(ts_ms=3000, request_id="r3", tool="transfer_eth", ok=True, summary={"chain": "ETH", "amount": 1})
+    audit_db.append(ts_ms=1000, request_id="r1", tool="place_market_order", ok=True, summary={"symbol": "MSFT", "side": "buy", "amount": 100})
+    audit_db.append(ts_ms=2000, request_id="r2", tool="place_stock_order", ok=True, summary={"symbol": "AAPL", "side": "buy", "amount": 10})
+    audit_db.append(ts_ms=3000, request_id="r3", tool="place_limit_order", ok=True, summary={"symbol": "TSLA", "side": "sell", "amount": 5})
     
     csv_out = audit_db.export_tax_report()
-    assert "USDC -> ETH" in csv_out
+    assert "MSFT" in csv_out
     assert "AAPL" in csv_out
-    assert "SEND" in csv_out
+    assert "TSLA" in csv_out
 
 def test_audit_disabled_if_no_path():
     with patch.dict(os.environ, {}, clear=True):

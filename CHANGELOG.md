@@ -1,16 +1,16 @@
 ## Changelog
 
-This project follows a lightweight changelog format. Major changes are summarized here to help operators and integrators understand what changed between versions.
+This project follows a lightweight changelog format.
 
 ### Unreleased
-- TBD
+- **Stock Focus Transition**: Completed full refactor from crypto-focused connections to stock brokerage architecture.
+- **WebSocket Streams**: Replaced crypto streams (Binance/Coinbase/Kraken) with Alpaca stock streaming.
+- **Execution Routing**: Updated router terminology to focus on stock brokerages and retail execution.
+- **Tool Catalog**: Cleaned up MCP tools to remove crypto-specific actions (`swap_tokens`, `get_crypto_price`, etc.).
+- **Documentation**: Fully rebranded all docs from ReadyTrader-Stocks to ReadyTrader-Stocks.
 
 ### 0.1.0 (2025-12-29)
-- **Agent-first MCP server** for crypto trading workflows (paper mode + optional live execution).
-- **Safety governance**: risk disclosure consent gate, kill switch, optional approve-each execution with replay protection.
-- **Execution breadth**: CEX via CCXT + DEX swaps (1inch builder) with execution routing (`dex`/`cex`/`hybrid`).
-- **Market data quality**: websocket-first public streams (opt-in), MarketDataBus freshness selection, plugin feed interface.
-- **Stress lab**: deterministic synthetic stress testing with exportable artifacts + heuristic recommendations.
-- **Operator layer**: structured logs with redaction, metrics snapshots, optional Prometheus text export, runbook and error catalog.
-- **Custody hardening**: signer abstraction (env/keystore/remote), signing intents, defense-in-depth signer policy wrapper.
-
+- **Initial Release (Crypto Focus)**: Agent-first MCP server for crypto trading workflows.
+- **Safety governance**: risk disclosure, kill switch, approve-each execution.
+- **Execution**: CEX via CCXT + DEX swaps.
+- **Stress lab**: deterministic synthetic stress testing.

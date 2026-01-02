@@ -1,5 +1,5 @@
 """
-Two-step execution proposal store (Phase 6).
+Two-step execution proposal store.
 
 This is used when `EXECUTION_APPROVAL_MODE=approve_each`.
 Instead of executing immediately, the server returns a proposal:
@@ -7,7 +7,7 @@ Instead of executing immediately, the server returns a proposal:
 - `confirm_token`: single-use token (replay protection)
 - `expires_at`: TTL deadline (prevents stale approvals)
 
-Phase 1B: Optional SQLite persistence can be enabled for operator visibility.
+Optional SQLite persistence can be enabled for operator visibility.
 Safety rules:
 - Proposals are invalidated across restarts via a per-process session id (so stale approvals cannot execute).
 - Risk consent is NOT persisted (consent remains in-memory only by design).
@@ -24,7 +24,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
-# Phase 2: Webhooks for notifications
+# Webhooks for notifications
 try:
     from observability.webhooks import WebhookManager
 except ImportError:
@@ -188,7 +188,7 @@ class ExecutionStore:
             self._items[request_id] = prop
             self._persist(prop)
             
-            # Phase 2: Notification callback
+            # Notification callback
             if WebhookManager:
                 # Attempt to extract symbol and amount for a prettier message
                 amount = float(payload.get("amount") or 0.0)

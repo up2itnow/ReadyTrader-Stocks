@@ -67,14 +67,11 @@ ReadyTrader-Stocks operates on a **User-Custodied** basis. This means:
 
 *   **📉 Paper Trading Simulator**: Zero-risk practice environment with persistent balances and realistic order handling.
 *   **🧠 Strategy Factory**: Built-in Backtesting Engine with a **Strategy Marketplace** for saving and sharing agent configurations.
-*   **🏦 Deep DeFi Integration**: Direct support for **Aave V3** (Lending) and **Uniswap V3** (Concentrated Liquidity).
-*   **🛡️ Risk Guardian**: Hard-coded safety layer. Automatically rejects trade requests that violate risk rules.
-*   **🤝 Multi-Agent Orchestration**: Support for "Researcher" and "Executor" agent handoffs via a shared **Insight Store**.
-*   **📰 Advanced Intelligence**: Real-time sentiment feeds from X, Reddit, and News APIs with local NLP fallbacks.
+*   **📰 Advanced Intelligence**: Real-time sentiment feeds from Reddit and News APIs with local NLP fallbacks.
 
 ---
 
-## ⚡ 10-minute evaluation (Phase 6)
+## ⚡ 10-minute evaluation
 
 Run both demos locally (no exchange keys, no RPC needed):
 
@@ -133,11 +130,9 @@ Create a `.env` file or pass environment variables. Start from `env.example` (co
 
 | Variable | Description |
 | :--- | :--- |
-| `PRIVATE_KEY` | Hex private key for signing (if `SIGNER_TYPE=env_private_key`). |
-| `CEX_API_KEY` | API Key for your primary exchange. |
-| `CEX_API_SECRET` | API Secret for your primary exchange. |
-| `SIGNER_TYPE` | `env_private_key`, `keystore`, or `remote`. |
-| `CEX_BINANCE_API_KEY` | Exchange-specific keys (e.g., `CEX_BINANCE_...`). |
+| `ALPACA_API_KEY` | API Key for Alpaca brokerage. |
+| `ALPACA_API_SECRET` | API Secret for Alpaca brokerage. |
+| `TRADIER_ACCESS_TOKEN` | Access Token for Tradier. |
 </details>
 
 <details>
@@ -145,10 +140,9 @@ Create a `.env` file or pass environment variables. Start from `env.example` (co
 
 | Variable | Default | Description |
 | :--- | :--- | :--- |
-| `MARKETDATA_EXCHANGES` | `binance...` | Comma-separated list of exchanges to use for data. |
+| `MARKETDATA_EXCHANGES` | `alpaca` | Comma-separated list of brokerages to use for data. |
 | `TICKER_CACHE_TTL_SEC` | `5` | How long to cache price data. |
-| `DEX_SLIPPAGE_PCT` | `1.0` | Default slippage for DEX swaps. |
-| `ALLOW_TOKENS` | `*` | Comma-separated allowlist of tradeable tokens. |
+| `ALLOW_TICKERS` | `*` | Comma-separated allowlist of tradeable tickers. |
 </details>
 
 <details>
@@ -278,7 +272,7 @@ For the complete (generated) tool catalog with signatures and docstrings, see: `
 | :--- | :--- | :--- |
 | **Market Data** | `get_stock_price` | Live price from brokerage/data provider. |
 | | `fetch_ohlcv` | Historical candles for research. |
-| | `get_market_regime` | **Trend/Chop Detection** (Phase 6). |
+| | `get_market_regime` | **Trend/Chop Detection**. |
 | **Intelligence** | `get_sentiment` | Fear & Greed Index (Market). |
 | | `get_social_sentiment` | X/Reddit Analysis (Financial focus). |
 | | `get_financial_news` | Bloomberg/Reuters (Simulated/Real). |
@@ -293,7 +287,7 @@ For the complete (generated) tool catalog with signatures and docstrings, see: `
 ---
 *Built for the Agentic Future.*
 
-## 🧪 Synthetic Stress Testing (Phase 5)
+## 🧪 Synthetic Stress Testing
 This MCP includes a **100% randomized (but deterministic-by-seed)** synthetic market simulator. It can generate trending, ranging, and volatile regimes and inject **black swan crashes** and **parabolic blow-off tops**.
 
 ### Tool: `run_synthetic_stress_test(strategy_code, config_json='{}')`
@@ -321,7 +315,7 @@ Example `config_json`:
 ---
 
 ## 📌 Project docs
-- `docs/README.md`: docs index / navigation
+- `README.md`: Project overview and configuration
 - `docs/TOOLS.md`: complete tool catalog (generated from `app/tools`)
 - `docs/ERRORS.md`: common error codes and operator troubleshooting
 - `docs/EXCHANGES.md`: exchange capability matrix (Supported vs Experimental)

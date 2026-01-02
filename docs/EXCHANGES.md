@@ -1,63 +1,54 @@
-## ReadyTrader-Crypto — Exchange Capabilities (Phase 2A)
+## ReadyTrader-Stocks — Brokerage Capabilities
 
-This is a **truthful capability matrix** intended to reduce surprises. “Supported” means we have a clear tool path, tests, and documented behavior. “Experimental” means it may work, but behavior varies by exchange/market type.
+This is a **truthful capability matrix** for stock brokerages. “Supported” means we have a clear tool path, tests, and documented behavior. “Experimental” means it may work, but behavior varies.
 
 ### Legend
 - **Supported**: expected to work reliably; covered by unit tests where possible.
-- **Experimental**: best-effort; exchange-specific quirks likely.
+- **Experimental**: best-effort; brokerage-specific quirks likely.
 - **N/A**: not implemented.
 
 ### Public market data
-ReadyTrader-Crypto can fetch public data via:
-- **CCXT REST** (broad exchange coverage; configured via `MARKETDATA_EXCHANGES`)
-- **Public websocket tickers (opt-in)**: Binance / Coinbase / Kraken (see `start_marketdata_ws`)
+ReadyTrader-Stocks can fetch public data via:
+- **yfinance** (Standard fallback for historical and real-time quotes)
+- **Alpaca REST** (Configured via `ALPACA_API_KEY`)
+- **Alpaca WebSocket Tickers (opt-in)**: Real-time quotes via IEX/SIP (see `start_marketdata_ws`)
 
 ### Private account/order updates
-ReadyTrader-Crypto supports:
-- **Binance user stream (websocket)**: best-effort private updates for spot + swap
-- **Polling fallback (Phase 2)** for other exchanges: periodically fetch open orders and emit changes (not realtime)
+ReadyTrader-Stocks supports:
+- **Brokerage Polling** for all supported providers: periodically fetch open orders and portfolio status.
+- **Alpaca Events (Future)**: Real-time trade/order updates.
 
 ---
 
 ## Capability matrix (high level)
 
-| Exchange | Spot (CEX tools) | Swap/Futures (CEX tools) | Public WS ticker | Private updates | Notes |
-|---|---|---:|---:|---:|---|
-| **Binance** | Supported | Supported (swap) / Experimental (future) | Supported | Supported (WS) | Private WS uses listenKey; opt-in. |
-| **Coinbase** | Supported | N/A | Supported | Experimental (poll) | Private updates via poll fallback. |
-| **Kraken** | Supported | Experimental | Supported | Experimental (poll) | Private updates via poll fallback. |
-| **Bybit** | Experimental | Experimental | N/A (REST only) | Experimental (poll) | CCXT REST only in this repo. |
-| **OKX** | Experimental | Experimental | N/A (REST only) | Experimental (poll) | CCXT REST only in this repo. |
-| **KuCoin** | Experimental | Experimental | N/A (REST only) | Experimental (poll) | CCXT REST only in this repo. |
+| Brokerage | Market Orders | Limit Orders | Streaming Data | Paper Trading | Notes |
+|-----------|--------------|--------------|----------------|---------------|-------|
+| **Alpaca** | Supported | Supported | Supported (WS) | Supported | Recommended for paper trading |
+| **Tradier** | Supported | Supported | N/A (REST only) | N/A | OAuth required |
+| **Schwab** | Experimental | Experimental | N/A | N/A | Bearer token required |
+| **E*TRADE** | Experimental | Experimental | N/A | N/A | OAuth1 |
+| **Robinhood** | Experimental | Experimental | N/A | N/A | MFA complications |
 
 ---
 
-## Tool coverage (CEX)
+## Tool coverage (Brokerage)
 
 ### Core execution
-- `place_cex_order(...)`: Supported (spot widely; derivatives depend on exchange + `market_type`)
-- `cancel_cex_order(...)`: Supported
-- `get_cex_order(...)`: Supported
-- `wait_for_cex_order(...)`: Supported (polling helper; useful even without private WS)
+- `place_stock_order(...)`: Supported (Alpaca, Tradier)
+- `cancel_order(...)`: Supported
+- `get_order(...)`: Supported (Polling fallback)
 
-### Account and lifecycle
-- `get_cex_balance(...)`: Supported (auth required)
-- `list_cex_open_orders(...)`: Supported (auth required)
-- `list_cex_orders(...)`: Supported (auth required)
-- `get_cex_my_trades(...)`: Supported (auth required)
-- `cancel_all_cex_orders(...)`: Capability-gated (`cancelAllOrders`)
-- `replace_cex_order(...)`: Capability-gated (`editOrder`)
+### Account and portfolio
+- `get_portfolio_balance()`: Supported
+- `list_positions()`: Supported
+- `reset_paper_wallet()`: Supported (Paper mode only)
 
 ---
 
 ## Operator notes
 
-### Market type (spot/swap/future)
-ReadyTrader-Crypto uses `market_type` to configure CCXT defaultType. Exchanges vary; if you see symbol mismatches, use `get_cex_capabilities(exchange, symbol, market_type)` to inspect the resolved symbol/market metadata.
-
-### Private updates (poll fallback)
-For exchanges without private websocket support in this repo:
-- `start_cex_private_ws(exchange=..., market_type=...)` starts a **poller** (not realtime).
-- Tune with: `CEX_PRIVATE_POLL_INTERVAL_SEC` (default 2.0 seconds).
-- Polling is subject to exchange rate limits; use sparingly and prefer `wait_for_cex_order(...)` for one-off waits.
-
+### Polling frequency
+For brokerages without real-time event support:
+- `BROKERAGE_POLL_INTERVAL_SEC` (default 2.0 seconds) is used to refresh local state.
+- Polling is subject to rate limits; use sparingly.

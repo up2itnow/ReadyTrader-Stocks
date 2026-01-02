@@ -18,7 +18,7 @@
 
 #### Rotate secrets
 - Prefer keystore or remote signer in live environments.
-- Rotate `CEX_*` credentials by updating env vars and restarting.
+- Rotate `BROKERAGE_*` credentials by updating env vars and restarting.
 
 #### Debug execution failures
 - Look for JSON logs with `event=tool_error` (and check `level`).
@@ -27,12 +27,12 @@
 
 #### Websocket market streams
 - Start public streams with `start_marketdata_ws(...)` and stop with `stop_marketdata_ws(...)`.
-- For Binance private order updates, use `start_cex_private_ws(...)` / `stop_cex_private_ws(...)`, and inspect with
-  `list_cex_private_updates(...)`.
+- For brokerage-specific private order updates (if supported), use `start_brokerage_private_ws(...)` / `stop_brokerage_private_ws(...)`, and if available, inspect with
+  `list_brokerage_private_updates(...)`.
 
 ---
 
-### Incident playbooks (Phase 4)
+### Incident playbooks
 
 #### 1) Rate limit storm (tools returning `rate_limited`)
 - **Symptoms**:
@@ -71,7 +71,7 @@
   - Private update pollers show errors / lag
 - **Triage**:
   - Check `docs/EXCHANGES.md` (Supported vs Experimental expectations)
-  - Use `get_cex_capabilities(exchange)` for `has.*` and market metadata
+  - Use `get_brokerage_capabilities(brokerage)` for `has.*` and market metadata
   - Check market data: `get_ticker(symbol)` meta → `candidates`
 - **Mitigation**:
   - Switch market data sources (prefer websocket/ingest, reduce REST usage)
@@ -79,7 +79,7 @@
 
 #### 4) Signer unreachable (remote signer / keystore issues)
 - **Symptoms**:
-  - Live DEX execution fails with signing errors
+  - Live execution fails with signing errors (if using signed messages/headers)
   - Errors like `remote_signer_error` or signer initialization failures
 - **Triage**:
   - Confirm signer configuration (`SIGNER_TYPE`, keystore path/password, remote signer URL)
