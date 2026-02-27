@@ -2,6 +2,7 @@ import json
 from typing import Any, Dict, List
 
 from fastmcp import FastMCP
+
 from app.core.container import global_container
 
 
@@ -42,8 +43,10 @@ def fetch_ohlcv(symbol: str, timeframe: str = '1d', limit: int = 100) -> str:
         data = df.reset_index().to_dict(orient="records")
         # Convert timestamps to string
         for d in data:
-            if 'index' in d: d['timestamp'] = str(d.pop('index'))
-            elif 'Date' in d: d['timestamp'] = str(d.pop('Date'))
+            if 'index' in d:
+                d['timestamp'] = str(d.pop('index'))
+            elif 'Date' in d:
+                d['timestamp'] = str(d.pop('Date'))
         return _json_ok({"symbol": symbol, "timeframe": timeframe, "history": data})
     except Exception as e:
         return _json_err("history_error", str(e), {"symbol": symbol})

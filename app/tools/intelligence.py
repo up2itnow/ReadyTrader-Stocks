@@ -3,11 +3,11 @@ from typing import Any, Dict
 
 from fastmcp import FastMCP
 
-from intelligence import get_market_sentiment as _get_mkt_sentiment
 from intelligence import get_market_news as _get_mkt_news
-from intelligence.core import fetch_rss_news as _fetch_rss
+from intelligence import get_market_sentiment as _get_mkt_sentiment
 from intelligence.core import analyze_social_sentiment as _analyze_social
 from intelligence.core import fetch_financial_news as _fetch_fin_news
+from intelligence.core import fetch_rss_news as _fetch_rss
 
 
 def _json_ok(data: Dict[str, Any] | None = None) -> str:

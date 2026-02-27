@@ -2,7 +2,6 @@ from typing import Any, Dict, Optional
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-
 from signing import get_signer
 from signing.intents import build_evm_tx_intent
 from signing.policy import SignerPolicyViolation

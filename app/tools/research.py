@@ -2,6 +2,7 @@ import json
 from typing import Any, Dict
 
 from fastmcp import FastMCP
+
 from app.core.container import global_container
 from core.stress_test import run_synthetic_stress_test as _run_stress
 

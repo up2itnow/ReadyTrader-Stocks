@@ -60,7 +60,8 @@ CATEGORY_ORDER = [
 def main():
     tools = {}
     for py_file in TOOLS_DIR.glob("*.py"):
-        if py_file.name == "__init__.py": continue
+        if py_file.name == "__init__.py":
+            continue
         tree = ast.parse(py_file.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef):
