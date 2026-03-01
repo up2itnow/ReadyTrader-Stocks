@@ -13,6 +13,11 @@ try:
     _ALPACA_PY_AVAILABLE = True
 except ImportError:
     _ALPACA_PY_AVAILABLE = False
+    TradingClient = None
+    OrderSide = None
+    TimeInForce = None
+    LimitOrderRequest = None
+    MarketOrderRequest = None
 
 class AlpacaBrokerage(IBrokerage):
     """
